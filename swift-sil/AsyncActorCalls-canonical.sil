@@ -1,0 +1,424 @@
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+@MainActor func mainActorWork() -> Int
+
+func callFromNonIsolated() async -> Int
+
+actor Counter {
+  @_hasStorage @_hasInitialValue var value: Int { get set }
+  func increment() -> Int
+  @objc deinit
+  init()
+  @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+  @_semantics("defaultActor") nonisolated final var unownedExecutor: UnownedSerialExecutor {
+    get
+  }
+}
+
+func useCounter(_ counter: Counter) async -> Int
+
+actor OtherActor {
+  @_hasStorage final let counter: Counter { get }
+  init(counter: Counter)
+  func callCounter() async -> Int
+  @objc deinit
+  @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+  @_semantics("defaultActor") nonisolated final var unownedExecutor: UnownedSerialExecutor {
+    get
+  }
+}
+
+// main
+// Isolation: unspecified
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %2 = integer_literal $Builtin.Int32, 0          // user: %3
+  %3 = struct $Int32 (%2)                         // user: %4
+  return %3                                       // id: %4
+} // end sil function 'main'
+
+// mainActorWork()
+// Isolation: global_actor. type: MainActor
+sil hidden @$s15AsyncActorCalls04mainB4WorkSiyF : $@convention(thin) () -> Int {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 42         // user: %1
+  %1 = struct $Int (%0)                           // user: %2
+  return %1                                       // id: %2
+} // end sil function '$s15AsyncActorCalls04mainB4WorkSiyF'
+
+// Int.init(_builtinIntegerLiteral:)
+// Isolation: unspecified
+sil public_external [transparent] @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int {
+// %0                                             // user: %2
+bb0(%0 : $Builtin.IntLiteral, %1 : $@thin Int.Type):
+  %2 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0) : $(Builtin.Int64, Builtin.Int1) // user: %3
+  %3 = tuple_extract %2, 0                        // user: %4
+  %4 = struct $Int (%3)                           // user: %5
+  return %4                                       // id: %5
+} // end sil function '$sSi22_builtinIntegerLiteralSiBI_tcfC'
+
+// callFromNonIsolated()
+// Isolation: unspecified
+sil hidden @$s15AsyncActorCalls19callFromNonIsolatedSiyYaF : $@convention(thin) @async () -> Int {
+bb0:
+  %0 = enum $Optional<Builtin.Executor>, #Optional.none!enumelt // user: %1
+  hop_to_executor %0                              // id: %1
+  // function_ref mainActorWork()
+  %2 = function_ref @$s15AsyncActorCalls04mainB4WorkSiyF : $@convention(thin) () -> Int // user: %7
+  %3 = metatype $@thick MainActor.Type            // user: %5
+  // function_ref static MainActor.shared.getter
+  %4 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %5
+  %5 = apply %4(%3) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // users: %8, %6
+  hop_to_executor %5                              // id: %6
+  %7 = apply %2() : $@convention(thin) () -> Int  // user: %9
+  strong_release %5                               // id: %8
+  return %7                                       // id: %9
+} // end sil function '$s15AsyncActorCalls19callFromNonIsolatedSiyYaF'
+
+// static MainActor.shared.getter
+// Isolation: unspecified
+sil [available 12.0.0] @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+
+// variable initialization expression of Counter.value
+// Isolation: unspecified
+sil hidden [transparent] @$s15AsyncActorCalls7CounterC5valueSivpfi : $@convention(thin) () -> Int {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0          // user: %1
+  %1 = struct $Int (%0)                           // user: %2
+  return %1                                       // id: %2
+} // end sil function '$s15AsyncActorCalls7CounterC5valueSivpfi'
+
+// Counter.value.getter
+// Isolation: actor_instance. name: 'self'
+sil hidden [transparent] @$s15AsyncActorCalls7CounterC5valueSivg : $@convention(method) (@sil_isolated @guaranteed Counter) -> Int {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $Counter):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = ref_element_addr %0, #Counter.value        // user: %3
+  %3 = begin_access [read] [dynamic] %2           // users: %4, %5
+  %4 = load %3                                    // user: %6
+  end_access %3                                   // id: %5
+  return %4                                       // id: %6
+} // end sil function '$s15AsyncActorCalls7CounterC5valueSivg'
+
+// Counter.value.setter
+// Isolation: actor_instance. name: 'self'
+sil hidden [transparent] @$s15AsyncActorCalls7CounterC5valueSivs : $@convention(method) (Int, @sil_isolated @guaranteed Counter) -> () {
+// %0 "value"                                     // users: %6, %2
+// %1 "self"                                      // users: %4, %3
+bb0(%0 : $Int, %1 : $Counter):
+  debug_value %0, let, name "value", argno 1      // id: %2
+  debug_value %1, let, name "self", argno 2       // id: %3
+  %4 = ref_element_addr %1, #Counter.value        // user: %5
+  %5 = begin_access [modify] [dynamic] %4         // users: %6, %7
+  store %0 to %5                                  // id: %6
+  end_access %5                                   // id: %7
+  %8 = tuple ()                                   // user: %9
+  return %8                                       // id: %9
+} // end sil function '$s15AsyncActorCalls7CounterC5valueSivs'
+
+// Counter.value.modify
+// Isolation: actor_instance. name: 'self'
+sil hidden [transparent] @$s15AsyncActorCalls7CounterC5valueSivM : $@yield_once @convention(method) (@sil_isolated @guaranteed Counter) -> @yields @inout Int {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $Counter):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = ref_element_addr %0, #Counter.value        // user: %3
+  %3 = begin_access [modify] [dynamic] %2         // users: %5, %8, %4
+  yield %3, resume bb1, unwind bb2                // id: %4
+
+bb1:                                              // Preds: bb0
+  end_access %3                                   // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6                                       // id: %7
+
+bb2:                                              // Preds: bb0
+  end_access %3                                   // id: %8
+  unwind                                          // id: %9
+} // end sil function '$s15AsyncActorCalls7CounterC5valueSivM'
+
+// Counter.increment()
+// Isolation: actor_instance. name: 'self'
+sil hidden @$s15AsyncActorCalls7CounterC9incrementSiyF : $@convention(method) (@sil_isolated @guaranteed Counter) -> Int {
+// %0 "self"                                      // users: %17, %16, %4, %3, %1
+bb0(%0 : $Counter):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = integer_literal $Builtin.Int64, 1          // user: %9
+  %3 = class_method %0, #Counter.value!modify : (isolated Counter) -> () -> (), $@yield_once @convention(method) (@sil_isolated @guaranteed Counter) -> @yields @inout Int // user: %4
+  (%4, %5) = begin_apply %3(%0) : $@yield_once @convention(method) (@sil_isolated @guaranteed Counter) -> @yields @inout Int // users: %14, %6, %15
+  %6 = struct_element_addr %4, #Int._value        // user: %7
+  %7 = load %6                                    // user: %9
+  %8 = integer_literal $Builtin.Int1, -1          // user: %9
+  %9 = builtin "sadd_with_overflow_Int64"(%7, %2, %8) : $(Builtin.Int64, Builtin.Int1) // users: %11, %10
+  %10 = tuple_extract %9, 0                       // user: %13
+  %11 = tuple_extract %9, 1                       // user: %12
+  cond_fail %11, "arithmetic overflow"            // id: %12
+  %13 = struct $Int (%10)                         // user: %14
+  store %13 to %4                                 // id: %14
+  %15 = end_apply %5 as $()
+  %16 = class_method %0, #Counter.value!getter : (isolated Counter) -> () -> Int, $@convention(method) (@sil_isolated @guaranteed Counter) -> Int // user: %17
+  %17 = apply %16(%0) : $@convention(method) (@sil_isolated @guaranteed Counter) -> Int // user: %18
+  return %17                                      // id: %18
+} // end sil function '$s15AsyncActorCalls7CounterC9incrementSiyF'
+
+// static Int.+= infix(_:_:)
+// Isolation: unspecified
+sil public_external [transparent] @$sSi2peoiyySiz_SitFZ : $@convention(method) (@inout Int, Int, @thin Int.Type) -> () {
+// %0                                             // users: %12, %3
+// %1                                             // user: %5
+bb0(%0 : $*Int, %1 : $Int, %2 : $@thin Int.Type):
+  %3 = struct_element_addr %0, #Int._value        // user: %4
+  %4 = load %3                                    // user: %7
+  %5 = struct_extract %1, #Int._value             // user: %7
+  %6 = integer_literal $Builtin.Int1, -1          // user: %7
+  %7 = builtin "sadd_with_overflow_Int64"(%4, %5, %6) : $(Builtin.Int64, Builtin.Int1) // users: %9, %8
+  %8 = tuple_extract %7, 0                        // user: %11
+  %9 = tuple_extract %7, 1                        // user: %10
+  cond_fail %9, "arithmetic overflow"             // id: %10
+  %11 = struct $Int (%8)                          // user: %12
+  store %11 to %0                                 // id: %12
+  %13 = tuple ()                                  // user: %14
+  return %13                                      // id: %14
+} // end sil function '$sSi2peoiyySiz_SitFZ'
+
+// Counter.deinit
+// Isolation: unspecified
+sil hidden @$s15AsyncActorCalls7CounterCfd : $@convention(method) (@guaranteed Counter) -> @owned Builtin.NativeObject {
+// %0 "self"                                      // users: %3, %2, %1
+bb0(%0 : $Counter):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = builtin "destroyDefaultActor"(%0) : $()
+  %3 = unchecked_ref_cast %0 to $Builtin.NativeObject // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s15AsyncActorCalls7CounterCfd'
+
+// Counter.__deallocating_deinit
+// Isolation: nonisolated
+sil hidden @$s15AsyncActorCalls7CounterCfD : $@convention(method) (@owned Counter) -> () {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $Counter):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  // function_ref Counter.deinit
+  %2 = function_ref @$s15AsyncActorCalls7CounterCfd : $@convention(method) (@guaranteed Counter) -> @owned Builtin.NativeObject // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed Counter) -> @owned Builtin.NativeObject // user: %4
+  %4 = unchecked_ref_cast %3 to $Counter          // user: %5
+  dealloc_ref %4                                  // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6                                       // id: %7
+} // end sil function '$s15AsyncActorCalls7CounterCfD'
+
+// Counter.__allocating_init()
+// Isolation: nonisolated
+sil hidden [exact_self_class] @$s15AsyncActorCalls7CounterCACycfC : $@convention(method) (@thick Counter.Type) -> @owned Counter {
+// %0 "$metatype"
+bb0(%0 : $@thick Counter.Type):
+  %1 = alloc_ref $Counter                         // user: %3
+  // function_ref Counter.init()
+  %2 = function_ref @$s15AsyncActorCalls7CounterCACycfc : $@convention(method) (@owned Counter) -> @owned Counter // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@owned Counter) -> @owned Counter // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s15AsyncActorCalls7CounterCACycfC'
+
+// Counter.init()
+// Isolation: nonisolated
+sil hidden @$s15AsyncActorCalls7CounterCACycfc : $@convention(method) (@owned Counter) -> @owned Counter {
+// %0 "self"                                      // users: %3, %2, %1
+bb0(%0 : $Counter):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = builtin "initializeDefaultActor"(%0) : $()
+  %3 = end_init_let_ref %0                        // users: %4, %8
+  %4 = ref_element_addr %3, #Counter.value        // user: %7
+  %5 = integer_literal $Builtin.Int64, 0          // user: %6
+  %6 = struct $Int (%5)                           // user: %7
+  store %6 to %4                                  // id: %7
+  return %3                                       // id: %8
+} // end sil function '$s15AsyncActorCalls7CounterCACycfc'
+
+// Counter.unownedExecutor.getter
+// Isolation: nonisolated
+sil hidden [available 10.15] [_semantics "defaultActor"] @$s15AsyncActorCalls7CounterC15unownedExecutorScevg : $@convention(method) (@guaranteed Counter) -> UnownedSerialExecutor {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $Counter):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = metatype $@thin UnownedSerialExecutor.Type // user: %5
+  %3 = builtin "buildDefaultActorExecutorRef"<Counter>(%0) : $Builtin.Executor // user: %5
+  // function_ref UnownedSerialExecutor.init(_:)
+  %4 = function_ref @$sSceySceBecfC : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor // user: %5
+  %5 = apply %4(%3, %2) : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor // user: %6
+  return %5                                       // id: %6
+} // end sil function '$s15AsyncActorCalls7CounterC15unownedExecutorScevg'
+
+// UnownedSerialExecutor.init(_:)
+// Isolation: unspecified
+sil [available 12.0.0] @$sSceySceBecfC : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor
+
+// protocol witness for Actor.unownedExecutor.getter in conformance Counter
+// Isolation: nonisolated
+sil private [transparent] [thunk] @$s15AsyncActorCalls7CounterCScAAAScA15unownedExecutorScevgTW : $@convention(witness_method: Actor) (@guaranteed Counter) -> UnownedSerialExecutor {
+// %0                                             // user: %2
+bb0(%0 : $Counter):
+  // function_ref Counter.unownedExecutor.getter
+  %1 = function_ref @$s15AsyncActorCalls7CounterC15unownedExecutorScevg : $@convention(method) (@guaranteed Counter) -> UnownedSerialExecutor // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed Counter) -> UnownedSerialExecutor // user: %3
+  return %2                                       // id: %3
+} // end sil function '$s15AsyncActorCalls7CounterCScAAAScA15unownedExecutorScevgTW'
+
+// useCounter(_:)
+// Isolation: unspecified
+sil hidden @$s15AsyncActorCalls10useCounterySiAA0E0CYaF : $@convention(thin) @async (@guaranteed Counter) -> Int {
+// %0 "counter"                                   // users: %4, %3, %2, %1
+bb0(%0 : $Counter):
+  debug_value %0, let, name "counter", argno 1    // id: %1
+  %2 = class_method %0, #Counter.increment : (isolated Counter) -> () -> Int, $@convention(method) (@sil_isolated @guaranteed Counter) -> Int // user: %4
+  hop_to_executor %0                              // id: %3
+  %4 = apply %2(%0) : $@convention(method) (@sil_isolated @guaranteed Counter) -> Int // user: %5
+  return %4                                       // id: %5
+} // end sil function '$s15AsyncActorCalls10useCounterySiAA0E0CYaF'
+
+// OtherActor.counter.getter
+// Isolation: actor_instance. name: 'self'
+sil hidden [transparent] @$s15AsyncActorCalls05OtherB0C7counterAA7CounterCvg : $@convention(method) (@sil_isolated @guaranteed OtherActor) -> @owned Counter {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $OtherActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = ref_element_addr [immutable] %0, #OtherActor.counter // user: %3
+  %3 = load %2                                    // users: %5, %4
+  strong_retain %3                                // id: %4
+  return %3                                       // id: %5
+} // end sil function '$s15AsyncActorCalls05OtherB0C7counterAA7CounterCvg'
+
+// OtherActor.__allocating_init(counter:)
+// Isolation: nonisolated
+sil hidden [exact_self_class] @$s15AsyncActorCalls05OtherB0C7counterAcA7CounterC_tcfC : $@convention(method) (@owned Counter, @thick OtherActor.Type) -> @owned OtherActor {
+// %0 "counter"                                   // user: %4
+// %1 "$metatype"
+bb0(%0 : $Counter, %1 : $@thick OtherActor.Type):
+  %2 = alloc_ref $OtherActor                      // user: %4
+  // function_ref OtherActor.init(counter:)
+  %3 = function_ref @$s15AsyncActorCalls05OtherB0C7counterAcA7CounterC_tcfc : $@convention(method) (@owned Counter, @owned OtherActor) -> @owned OtherActor // user: %4
+  %4 = apply %3(%0, %2) : $@convention(method) (@owned Counter, @owned OtherActor) -> @owned OtherActor // user: %5
+  return %4                                       // id: %5
+} // end sil function '$s15AsyncActorCalls05OtherB0C7counterAcA7CounterC_tcfC'
+
+// OtherActor.init(counter:)
+// Isolation: nonisolated
+sil hidden @$s15AsyncActorCalls05OtherB0C7counterAcA7CounterC_tcfc : $@convention(method) (@owned Counter, @owned OtherActor) -> @owned OtherActor {
+// %0 "counter"                                   // users: %9, %7, %5, %2
+// %1 "self"                                      // users: %6, %8, %4, %3
+bb0(%0 : $Counter, %1 : $OtherActor):
+  debug_value %0, let, name "counter", argno 1    // id: %2
+  debug_value %1, let, name "self", argno 2       // id: %3
+  %4 = builtin "initializeDefaultActor"(%1) : $()
+  strong_retain %0                                // id: %5
+  %6 = ref_element_addr %1, #OtherActor.counter   // user: %7
+  store %0 to %6                                  // id: %7
+  %8 = end_init_let_ref %1                        // user: %10
+  strong_release %0                               // id: %9
+  return %8                                       // id: %10
+} // end sil function '$s15AsyncActorCalls05OtherB0C7counterAcA7CounterC_tcfc'
+
+// OtherActor.callCounter()
+// Isolation: actor_instance. name: 'self'
+sil hidden @$s15AsyncActorCalls05OtherB0C11callCounterSiyYaF : $@convention(method) @async (@sil_isolated @guaranteed OtherActor) -> Int {
+// %0 "self"                                      // users: %3, %2, %1
+bb0(%0 : $OtherActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  hop_to_executor %0                              // id: %2
+  %3 = ref_element_addr [immutable] %0, #OtherActor.counter // user: %4
+  %4 = load %3                                    // users: %9, %6, %8, %7, %5
+  strong_retain %4                                // id: %5
+  %6 = class_method %4, #Counter.increment : (isolated Counter) -> () -> Int, $@convention(method) (@sil_isolated @guaranteed Counter) -> Int // user: %8
+  hop_to_executor %4                              // id: %7
+  %8 = apply %6(%4) : $@convention(method) (@sil_isolated @guaranteed Counter) -> Int // user: %10
+  strong_release %4                               // id: %9
+  return %8                                       // id: %10
+} // end sil function '$s15AsyncActorCalls05OtherB0C11callCounterSiyYaF'
+
+// OtherActor.deinit
+// Isolation: unspecified
+sil hidden @$s15AsyncActorCalls05OtherB0Cfd : $@convention(method) (@guaranteed OtherActor) -> @owned Builtin.NativeObject {
+// %0 "self"                                      // users: %7, %6, %2, %1
+bb0(%0 : $OtherActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = ref_element_addr %0, #OtherActor.counter   // user: %3
+  %3 = begin_access [deinit] [static] %2          // users: %5, %4
+  destroy_addr %3                                 // id: %4
+  end_access %3                                   // id: %5
+  %6 = builtin "destroyDefaultActor"(%0) : $()
+  %7 = unchecked_ref_cast %0 to $Builtin.NativeObject // user: %8
+  return %7                                       // id: %8
+} // end sil function '$s15AsyncActorCalls05OtherB0Cfd'
+
+// OtherActor.__deallocating_deinit
+// Isolation: nonisolated
+sil hidden @$s15AsyncActorCalls05OtherB0CfD : $@convention(method) (@owned OtherActor) -> () {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $OtherActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  // function_ref OtherActor.deinit
+  %2 = function_ref @$s15AsyncActorCalls05OtherB0Cfd : $@convention(method) (@guaranteed OtherActor) -> @owned Builtin.NativeObject // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed OtherActor) -> @owned Builtin.NativeObject // user: %4
+  %4 = unchecked_ref_cast %3 to $OtherActor       // user: %5
+  dealloc_ref %4                                  // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6                                       // id: %7
+} // end sil function '$s15AsyncActorCalls05OtherB0CfD'
+
+// OtherActor.unownedExecutor.getter
+// Isolation: nonisolated
+sil hidden [available 10.15] [_semantics "defaultActor"] @$s15AsyncActorCalls05OtherB0C15unownedExecutorScevg : $@convention(method) (@guaranteed OtherActor) -> UnownedSerialExecutor {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $OtherActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = metatype $@thin UnownedSerialExecutor.Type // user: %5
+  %3 = builtin "buildDefaultActorExecutorRef"<OtherActor>(%0) : $Builtin.Executor // user: %5
+  // function_ref UnownedSerialExecutor.init(_:)
+  %4 = function_ref @$sSceySceBecfC : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor // user: %5
+  %5 = apply %4(%3, %2) : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor // user: %6
+  return %5                                       // id: %6
+} // end sil function '$s15AsyncActorCalls05OtherB0C15unownedExecutorScevg'
+
+// protocol witness for Actor.unownedExecutor.getter in conformance OtherActor
+// Isolation: nonisolated
+sil private [transparent] [thunk] @$s15AsyncActorCalls05OtherB0CScAAAScA15unownedExecutorScevgTW : $@convention(witness_method: Actor) (@guaranteed OtherActor) -> UnownedSerialExecutor {
+// %0                                             // user: %2
+bb0(%0 : $OtherActor):
+  // function_ref OtherActor.unownedExecutor.getter
+  %1 = function_ref @$s15AsyncActorCalls05OtherB0C15unownedExecutorScevg : $@convention(method) (@guaranteed OtherActor) -> UnownedSerialExecutor // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed OtherActor) -> UnownedSerialExecutor // user: %3
+  return %2                                       // id: %3
+} // end sil function '$s15AsyncActorCalls05OtherB0CScAAAScA15unownedExecutorScevgTW'
+
+sil_vtable Counter {
+  #Counter.value!getter: (isolated Counter) -> () -> Int : @$s15AsyncActorCalls7CounterC5valueSivg	// Counter.value.getter
+  #Counter.value!setter: (isolated Counter) -> (Int) -> () : @$s15AsyncActorCalls7CounterC5valueSivs	// Counter.value.setter
+  #Counter.value!modify: (isolated Counter) -> () -> () : @$s15AsyncActorCalls7CounterC5valueSivM	// Counter.value.modify
+  #Counter.increment: (isolated Counter) -> () -> Int : @$s15AsyncActorCalls7CounterC9incrementSiyF	// Counter.increment()
+  #Counter.init!allocator: (Counter.Type) -> () -> Counter : @$s15AsyncActorCalls7CounterCACycfC	// Counter.__allocating_init()
+  #Counter.deinit!deallocator: @$s15AsyncActorCalls7CounterCfD	// Counter.__deallocating_deinit
+}
+
+sil_vtable OtherActor {
+  #OtherActor.init!allocator: (OtherActor.Type) -> (Counter) -> OtherActor : @$s15AsyncActorCalls05OtherB0C7counterAcA7CounterC_tcfC	// OtherActor.__allocating_init(counter:)
+  #OtherActor.callCounter: (isolated OtherActor) -> () async -> Int : @$s15AsyncActorCalls05OtherB0C11callCounterSiyYaF	// OtherActor.callCounter()
+  #OtherActor.deinit!deallocator: @$s15AsyncActorCalls05OtherB0CfD	// OtherActor.__deallocating_deinit
+}
+
+sil_witness_table hidden Counter: Actor module AsyncActorCalls {
+  method #Actor.unownedExecutor!getter: <Self where Self : Actor> (Self) -> () -> UnownedSerialExecutor : @$s15AsyncActorCalls7CounterCScAAAScA15unownedExecutorScevgTW	// protocol witness for Actor.unownedExecutor.getter in conformance Counter
+}
+
+sil_witness_table hidden OtherActor: Actor module AsyncActorCalls {
+  method #Actor.unownedExecutor!getter: <Self where Self : Actor> (Self) -> () -> UnownedSerialExecutor : @$s15AsyncActorCalls05OtherB0CScAAAScA15unownedExecutorScevgTW	// protocol witness for Actor.unownedExecutor.getter in conformance OtherActor
+}
+
+
+
+// Mappings from '#fileID' to '#filePath':
+//   'AsyncActorCalls/AsyncActorCalls.swift' => 'AsyncActorCalls.swift'
+
+

@@ -1,0 +1,14 @@
+\section{Conclusion}
+\label{sec:conclusion}
+
+Swift Concurrency looks irregular when it is approached as a bag of diagnostics. It becomes substantially more regular when the same behaviors are grouped around three questions.
+
+\begin{itemize}
+  \item Which capability determines where this computation runs?
+  \item Which region records where this non-\code{Sendable} value currently lives?
+  \item How does the caller-side environment change after this interaction?
+\end{itemize}
+
+Those questions are sufficient to explain the phenomena that motivated the paper: same-isolation \code{sending} without consumption, ordinary same-isolation binding, result-side \code{sending} asymmetry, dynamic \code{@isolated(any)} behavior, task capture, actor-instance closure inference, and caller-inheriting nonisolated async execution after SE-0461~\cite{se0461}.
+
+The main value of the paper is therefore not a new keyword or a new compiler feature. It is a sharper mental model. Capability tells the reader where code runs. Region tells the reader where data lives. Affine update tells the reader what survives. These three notions are not novel in isolation—they trace back through decades of work on region types~\cite{tofte1997region}, static capabilities~\cite{walker2000capabilities}, and their application to safe concurrency~\cite{milano2022fearless}—but their coordinated use as a lens on Swift Concurrency is new. Once those roles are separated, Swift Concurrency becomes less a collection of surprises and more a structured type discipline whose corner cases can be reasoned about in advance.

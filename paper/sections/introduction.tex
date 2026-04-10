@@ -1,0 +1,34 @@
+\section{Introduction}
+\label{sec:introduction}
+
+Swift Concurrency gives programmers several ways to talk about isolation: actor annotations, \code{@Sendable}, \code{sending}, \code{isolated} parameters, \code{\#isolation}, \code{@isolated(any)}, and the caller-actor execution model for nonisolated async functions. Each feature has a clear local rationale in the proposal literature, but the combined system is still difficult to predict from surface syntax alone~\cite{se0313,se0414,se0420,se0430,se0431,se0461}. Experienced Swift programmers often know which keyword is present and still fail to predict whether a closure inherits actor context, whether a call consumes a value, or why a sync-looking function still requires \code{await}.
+
+The central difficulty is that the language surface compresses several semantic questions into a single informal word, \emph{isolation}. In practice, three questions must be answered separately.
+
+\begin{itemize}
+  \item Where does this computation execute?
+  \item Where does this non-\code{Sendable} value currently live?
+  \item After this expression, which bindings remain usable in the caller?
+\end{itemize}
+
+The motivating example is a minimal closure-conversion failure.
+
+\codefile{snippets/motivation.swift}
+
+The closure literal is written inside a \code{@MainActor} method, yet the parameter type is \code{@Sendable () -> Void}, so the closure body is checked without inherited actor context. The failure is therefore not an arbitrary compiler quirk. It is the visible consequence of a deeper split: sendability constrains capture, while isolation determines execution capability. Once those roles are separated, the diagnostic becomes predictable.
+
+\begin{propositionbox}{Thesis of the paper}
+Swift 6.2 concurrency becomes substantially more predictable when it is described with three coordinated notions: execution capability, value region, and affine environment update. Capability determines where code may run. Region determines where a non-\code{Sendable} value is currently connected. Affine update determines whether a call preserves, refines, or consumes the caller-side binding.
+\end{propositionbox}
+
+This decomposition draws on ideas from the programming-language theory literature on region types~\cite{tofte1997region,grossman2002cyclone}, static capabilities~\cite{walker2000capabilities,chargueraud2008capabilities}, their intersection~\cite{walker2001regions}, and capability-based concurrency safety~\cite{milano2022fearless}. It does more than explain one closure diagnostic. It explains why same-isolation \code{sending} can preserve access, why ordinary same-isolation calls bind disconnected values into actor regions, why cross-isolation results require explicit \code{sending}, why \code{@isolated(any)} behaves as a dynamic interface rather than a static actor annotation, and why \code{@nonisolated async} after SE-0461~\cite{se0461} is neither actor-hopping folklore nor merely \code{@concurrent} under another name.
+
+\begin{contributionbox}
+\begin{itemize}
+  \item The paper presents a compact rule kernel that separates execution capability, value region, and affine environment update, and uses that kernel to explain the highest-friction Swift Concurrency behaviors.
+  \item It sharpens the conversion story by distinguishing semantic subtyping, one-step contextual coercion, and explicit closure wrapping, with special attention to \code{@isolated(any)}, \code{@concurrent}, and \code{isolated} actor-parameter branches.
+  \item It validates the account against an executable compiler-probe suite and prints the complete rule catalog in the appendix so the paper remains useful both as an argument and as a reference artifact.
+\end{itemize}
+\end{contributionbox}
+
+The rest of the paper proceeds from intuition to formal core and then back to evidence. \Cref{sec:proposal-context} surveys the proposal cluster that defines modern Swift concurrency. \Cref{sec:irregular} explains why the resulting surface model feels irregular. \Cref{sec:model} introduces the judgment form, declaration boundaries, and the capability-region decomposition. \Cref{sec:conversion} characterizes function conversion as a structured family of relations rather than as one flat partial order. \Cref{sec:kernel} isolates the kernel rules that explain transfer, binding, closure inference, and dynamic isolation. \Cref{sec:case-studies} reconnects those rules to concrete case studies. \Cref{sec:validation} summarizes the validation evidence, \Cref{sec:discussion} discusses limits, and \Cref{sec:conclusion} concludes. The appendices print the auxiliary definitions, relation rules, and the full typing-rule inventory.

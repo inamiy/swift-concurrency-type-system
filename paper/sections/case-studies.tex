@@ -1,0 +1,46 @@
+\section{Case Studies}
+\label{sec:case-studies}
+
+The rule kernel is easier to trust once it is tied back to concrete examples. This section selects the examples that best expose the paper's main distinctions.
+
+\subsection{Same-Isolation Ordinary Calls versus Same-Isolation \code{sending}}
+
+\codefile{snippets/same-vs-cross-sending.swift}
+
+This example is the cleanest operational demonstration of the paper's thesis. The same \code{sending} parameter can be non-consuming when caller and callee share the same concrete actor isolation, yet consuming when the same value crosses to a different actor. Just as importantly, same-isolation ordinary calls and same-isolation \code{sending} calls are not identical. Ordinary calls may refine a disconnected value into an actor-bound region, whereas same-isolation \code{sending} preserves the original region. The difference is invisible at the type name level and visible only in the output environment.
+
+\subsection{Task Capture Separates Inheritance from Transfer}
+
+\codefile{snippets/task-capture.swift}
+
+The closure passed to \code{Task \{ \ldots \}} is itself sent to a new task. What happens to the captured environment depends on whether the closure inherits a same concrete actor context. Actor-isolated inherited tasks preserve captures. Detached tasks and nonisolated task creation sites consume disconnected non-\code{Sendable} captures. The case study therefore repeats the same structural split already seen for values: evidence of same isolation preserves access; lack of that evidence forces transfer.
+
+\subsection{\code{@nonisolated async} Is Caller-Inheriting, Not \code{@concurrent}}
+
+\codefile{snippets/nonisolated-async-task-region.swift}
+
+After SE-0461~\cite{se0461}, nonisolated async functions run on the caller's actor by default, but their non-\code{Sendable} parameters still behave like task-bound values rather than ordinary actor-bound values. This is why the parameter in the listing can be captured by a nonisolated closure and by an \code{@isolated(any)} closure, yet is rejected by a \code{@MainActor} closure. The example also illustrates a subtler point: caller inheritance does not imply that every non-\code{Sendable} result becomes disconnected. A fresh result may be transfer-ready, whereas a returned input can remain task-bound.
+
+\subsection{Dynamic Isolation and Caller-Side Evidence}
+
+\codefile{snippets/isolated-any-await.swift}
+
+Dynamic isolation and explicit same-isolation evidence are mirror images of one another. A value of type \code{@isolated(any) () -> Void} carries actor identity dynamically~\cite{se0431}, so the call site must assume cross-isolation behavior and write \code{await}. By contrast, \code{isolated} parameters~\cite{se0313} and \code{\#isolation}~\cite{se0420} provide same-isolation evidence to the type checker.
+
+\codefile{snippets/isolated-parameter.swift}
+
+The \code{isolated} parameter example shows that no separate call rule family is needed. The passed actor witness simply determines the callee isolation, after which the ordinary same-isolation and cross-isolation rules apply. The \code{\#isolation} mechanism used in higher-order helpers follows the same principle from the caller side.
+
+\codefile{snippets/isolation-macro.swift}
+
+The \code{\#isolation} helper makes same-isolation reasoning first-class. Because the closure argument is checked in the caller's isolation rather than across a boundary, the closure does not need \code{@Sendable}, mutable local state remains accessible, and the captured non-\code{Sendable} value is not consumed.
+
+\subsection{Cross-Isolation Results Are Stricter Than Parameters}
+
+\codefile{snippets/nonsending-result.swift}
+
+Cross-isolation parameters may transfer implicitly when the caller relinquishes ownership. Cross-isolation results are stricter because the caller is receiving a value whose region must already be known to be safe. That is why non-\code{Sendable} cross-isolation results require explicit \code{sending}, whereas disconnected arguments can be transferred implicitly. The asymmetry is one of the clearest places where the affine environment view is superior to slogan-level reasoning about isolation.
+
+\begin{propositionbox}{Why these examples matter together}
+The examples above are not independent curiosities. They all test the same joint thesis: execution capability answers where code runs, region answers where data lives, and affine update answers what survives after the interaction. Whenever a diagnosis looks surprising, one of those three questions was probably answered implicitly rather than explicitly.
+\end{propositionbox}

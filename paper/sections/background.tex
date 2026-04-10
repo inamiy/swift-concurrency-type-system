@@ -1,0 +1,39 @@
+\section{Proposal Context and Scope}
+\label{sec:proposal-context}
+
+The paper studies the proposal cluster that defines modern Swift concurrency behavior. \code{isolated} parameters and actor-instance control come from SE-0313~\cite{se0313}. Region-based isolation and flow-sensitive transfer come from SE-0414~\cite{se0414}. Method and key-path \code{Sendable} inference come from SE-0418~\cite{se0418}. Caller isolation inheritance and \code{\#isolation} come from SE-0420~\cite{se0420}. Explicit \code{sending} parameters and results come from SE-0430~\cite{se0430}. Dynamic \code{@isolated(any)} function values come from SE-0431~\cite{se0431}. The caller-actor execution model for nonisolated async functions is revised by SE-0461~\cite{se0461}.
+
+The goal is not to restate every rule those proposals contain. The goal is to extract the smallest account that still explains the behaviors programmers most often find irregular:
+
+\begin{itemize}
+  \item closure conversion and the loss or preservation of inherited actor context,
+  \item the difference between same-isolation binding and cross-isolation transfer for non-\code{Sendable} values,
+  \item the boundary between \code{@nonisolated async} and \code{@concurrent},
+  \item dynamic isolation through \code{@isolated(any)},
+  \item and caller-side evidence mechanisms such as \code{isolated} parameters and \code{\#isolation}.
+\end{itemize}
+
+The resulting model is intentionally selective. It is not a full mechanization of Swift, and it does not try to formalize every parser rule, standard-library API, or SIL optimization. It instead aims for explanatory leverage: a vocabulary strong enough to make the recurring diagnostics predictable.
+
+\section{Why the Surface Model Feels Irregular}
+\label{sec:irregular}
+
+The most common informal explanation of Swift Concurrency is that code is either isolated or nonisolated. That explanation is too coarse for at least three reasons.
+
+First, function values and function bodies live on different semantic layers.
+
+\codefile{snippets/handler-location.swift}
+
+The property \code{handler} lives in the region of the enclosing declaration, while the function body that the property stores runs according to the isolation annotation on the function type. A single phrase such as ``the closure is on \code{@FooActor}'' is therefore ambiguous. One must distinguish storage location from execution capability.
+
+Second, accessibility and capturability are not the same relation. A task-isolated value may be directly readable in some contexts and still be illegal to capture into an actor-isolated closure. This distinction is crucial for understanding nonisolated async parameters after SE-0461 and for explaining why \code{@isolated(any)} closures can capture some values that \code{@MainActor} closures cannot~\cite{se0461}.
+
+Third, boundary crossing is not the whole story. Same-isolation ordinary calls do not consume non-\code{Sendable} values, but they may refine a disconnected value into an actor-bound region. Same-isolation \code{sending} calls preserve the original region instead of binding it. Cross-isolation calls may consume the argument, while cross-isolation results require a separate explicit \code{sending} guarantee. The model therefore needs more than a boolean boundary test; it needs a caller-side environment that changes over time.
+
+\begin{definitionbox}{Three semantic relations}
+The paper distinguishes three relations that are often conflated in surface reasoning. $\Accessible(@\kappa)$ determines which regions can be used directly in a capability~$@\kappa$. $\Capturable(@\kappa)$ determines which regions may be captured into a closure checked under~$@\kappa$. $\canSend(@\kappa, @\iota, [\sending])$ determines when a call site performs an explicit or implicit transfer.
+\end{definitionbox}
+
+These distinctions also explain why global actors and actor instances behave differently under closure inference. A global-actor closure can inherit actor context without capturing a concrete actor value. An actor-instance closure keeps instance isolation only if the isolated parameter or \code{self} is actually captured. That capture-sensitive branch is easy to miss in proposal prose, but it is essential for matching compiler behavior.
+
+The next section turns these informal observations into a judgment form and a small set of auxiliary definitions.

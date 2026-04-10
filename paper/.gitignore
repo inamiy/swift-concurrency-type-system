@@ -1,0 +1,29 @@
+# LaTeX build artifacts
+*.aux
+*.bbl
+*.bcf
+*.blg
+*.fdb_latexmk
+*.fls
+*.log
+*.out
+*.run.xml
+*.synctex.gz
+*.toc
+*.lof
+*.lot
+*.nav
+*.snm
+*.vrb
+
+# Minted cache
+_minted-*/
+
+# Generated .bbl (copied from build/ for tectonic)
+*.bbl
+
+# Build output
+build/
+
+# Figures (symlink to docs/generated/)
+figures

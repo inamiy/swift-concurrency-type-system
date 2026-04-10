@@ -1,0 +1,54 @@
+\section{Validation Against Compiler Behavior}
+\label{sec:validation}
+
+The formalization is intentionally empirical. It takes the proposal cluster as the design background, but it treats observed compiler behavior as the calibration target. A rule that reads well yet fails against a focused probe suite is not accepted as part of the paper's account.
+
+The validation corpus is organized around five questions.
+
+\begin{itemize}
+  \item Which annotation changes compile as direct function conversions, and which require explicit wrapping?
+  \item When does same-isolation use preserve a non-\code{Sendable} value, and when does it refine or consume it?
+  \item Which construction paths preserve dynamic actor identity for \code{@isolated(any)} values?
+  \item When do closures keep actor-instance isolation, and when do they silently fall back to \code{@nonisolated}?
+  \item How do nonisolated async calls behave on fresh versus aliased non-\code{Sendable} results after SE-0461?
+\end{itemize}
+
+\begin{definitionbox}{Kinds of evidence}
+The corpus includes positive compilation tests, negative diagnostics, and property-style checks on observable values such as \code{f.isolation}. The paper relies on all three. Positive tests establish permissiveness, negative tests establish rejection boundaries, and observational tests establish which dynamic information survived a conversion path.
+\end{definitionbox}
+
+\subsection{Dynamic Isolation Identity Is Path Sensitive}
+
+\codefile{snippets/isolated-any-tests.swift}
+
+These tests are among the sharpest validation artifacts in the paper because they distinguish three superficially similar construction paths.
+
+\begin{itemize}
+  \item Direct conversion from \code{@MainActor () -> Void} to \code{@isolated(any) () -> Void} preserves actor identity.
+  \item Building an \code{@isolated(any)} closure literal inside a \code{@MainActor} context also preserves identity through closure inference.
+  \item Converting through a plain \code{() -> Void} erases actor identity, and coercing back to \code{@isolated(any)} does not recover it.
+\end{itemize}
+
+This is exactly the behavior predicted by the paper's distinction between direct coercion, contextual closure formation, and identity-erasing nonisolated conversion.
+
+\subsection{Actor-Instance Closure Inference Is Capture Sensitive}
+
+\codefile{snippets/actor-instance-closure.swift}
+
+Global-actor inheritance is type-level and does not require a captured actor value. Actor-instance inheritance is different. The first closure above captures \code{self.state}, so the effective closure capability remains the actor instance. The second closure does not capture the isolated parameter \code{self}, so the compiler is free to treat it as nonisolated. This distinction validates the auxiliary predicate $\capturesIsolatedParam$ and shows why closure inference cannot be modeled as a uniform ``inherit parent isolation'' rule.
+
+\subsection{Counterexamples Matter as Much as Success Cases}
+
+The paper's more delicate claims are justified by negative tests and counterexamples rather than by happy-path compilation alone. Three examples are especially important.
+
+\begin{itemize}
+  \item The same-isolation and cross-isolation \code{sending} tests show that transfer is conditional on actor-equality evidence, not on the presence of the keyword alone.
+  \item The nonisolated async identity counterexample shows that a returned non-\code{Sendable} value need not become disconnected merely because the callee is caller-inheriting after SE-0461. Fresh results and aliased results must be distinguished.
+  \item The cross-isolation non-\code{sending} result tests show that result positions are stricter than parameter positions, validating the paper's asymmetry claim for \code{sending}.
+\end{itemize}
+
+\begin{propositionbox}{Interpretation of the evidence}
+The validation results do not prove the formalization correct in the theorem-proving sense. They justify a narrower claim: within the compiler behaviors tested here, the capability-region-affine account predicts both successful and failing cases more faithfully than a one-dimensional notion of isolation.
+\end{propositionbox}
+
+This empirical stance is also a practical commitment. If future compiler behavior changes the observed conversion or transfer boundaries, the paper should change with it. The formalization is meant to remain aligned with executable evidence, not to float above it as a timeless prose summary.

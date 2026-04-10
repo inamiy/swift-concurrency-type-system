@@ -1,0 +1,42 @@
+\section{Discussion and Limits}
+\label{sec:discussion}
+
+The paper makes a deliberately ambitious but bounded claim. It does not claim that Swift Concurrency reduces to three words. It claims that the combination of capability, region, and affine environment update is the right explanatory vocabulary for the cluster of behaviors that programmers find hardest to predict in practice.
+
+That claim has three strengths.
+
+\begin{itemize}
+  \item It explains why syntactically distant features, such as \code{sending}, \code{Task} capture, \code{@isolated(any)}, and \code{\#isolation}, repeatedly trigger the same kinds of surprises.
+  \item It preserves the asymmetries that the compiler actually enforces, especially
+    parameter-versus-result transfer and global-actor versus actor-instance closure inference.
+  \item It leaves room for empirical calibration. The account is precise enough to fail against tests, which is exactly what a useful explanatory model should permit.
+\end{itemize}
+
+\begin{propositionbox}{What the model clarifies}
+The model clarifies that Swift Concurrency irregularity is not primarily a keyword problem. It is a problem of conflated semantic dimensions. Surface syntax often hides whether the relevant fact is execution capability, value region, or caller-side ownership update. Once those dimensions are separated, many ``special cases'' become routine consequences of the same discipline.
+\end{propositionbox}
+
+Important limits remain.
+
+\begin{itemize}
+  \item The account is not a mechanized proof of Swift. It is a compiler-calibrated formalization.
+  \item It abstracts away from many language surfaces, standard-library APIs, and optimizer-level details.
+  \item It treats closure wrapping as part of the operational conversion story rather than reducing every successful conversion to one uniform semantic relation.
+  \item It assumes the proposal cluster and the observed compiler behavior remain close enough that one explanatory account can serve both.
+\end{itemize}
+
+These limits are acceptable because they match the paper's purpose. The aim is not to replace the language reference or the compiler implementation. The aim is to make the existing system thinkable enough that a reader can predict new cases instead of memorizing diagnostics one by one.
+
+\subsection{Related Work}
+
+The capability-region decomposition in this paper is informed by several threads in the programming-language theory literature.
+
+Region-based memory management originates with Tofte and Talpin~\cite{tofte1997region}, who showed that stack-like region lifetimes can replace garbage collection for a polymorphic lambda calculus. Grossman et~al.~\cite{grossman2002cyclone} brought regions to the systems language Cyclone, demonstrating that region disciplines can coexist with low-level programming. Swift's region-based isolation (SE-0414) inherits the core insight—tracking value connectivity by region—but applies it to concurrency rather than memory deallocation.
+
+The static-capability approach was developed by Walker, Crary, and Morrisett~\cite{walker2000capabilities}, who used capabilities to govern access to typed memory. Chargu\'{e}raud and Pottier~\cite{chargueraud2008capabilities} further explored capability calculi with functional translations. Walker and Watkins~\cite{walker2001regions} connected regions and linear types, showing how affine or linear disciplines can track region liveness. The present paper's use of execution capability to determine \emph{where} code runs, and affine environment update to determine \emph{what} remains usable, echoes this tradition.
+
+Most directly relevant is Milano, Turcotti, and Myers~\cite{milano2022fearless}, who proposed a flexible type system for fearless concurrency combining regions, capabilities, and linearity. Their system demonstrated that capability-region typing can ensure safe concurrent access without requiring all shared values to be deeply immutable. The lineage is not merely intellectual: Joshua Turcotti co-authored both that paper and SE-0414~\cite{se0414}, which introduced region-based isolation into Swift. Swift's approach differs in surface design—using actor isolation and \code{Sendable} rather than explicit capability annotations—but the underlying semantic decomposition is strikingly parallel.
+
+\subsection{Future Work}
+
+Three directions seem most promising. First, a mechanized proof in a proof assistant such as Lean or Coq would strengthen the paper's claims from compiler-calibrated observation to verified soundness. The main obstacle is faithfully modeling Swift's contextual type inference and closure formation, which interact with region tracking in ways that are easy to describe informally but nontrivial to encode. Second, the model could be extended to cover distributed actors, where network boundaries introduce latency and failure modes that the current capability-region account does not address. Third, as Swift's ownership and borrowing features mature, the interaction between move-only types, consuming parameters, and the affine environment update described here will need a unified treatment. The current model's output environment already provides a natural attachment point for ownership effects.

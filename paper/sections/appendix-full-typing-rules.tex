@@ -1,0 +1,293 @@
+\section{Full Typing-Rule Catalog}
+\label{sec:appendix-full}
+
+This appendix prints the complete typing-rule inventory used by the paper. The main body emphasizes only a kernel, but no rule family is omitted here.
+
+\subsection{Variables}
+
+\subsubsection{\textsc{var}}
+
+\typerule{var}
+  {x : T \at \rho \in \Gamma \\ \rho \in \Accessible(@\kappa)}
+  {\Gamma;\; @\kappa;\; \alpha \vdash x : T \at \rho \dashv \Gamma}
+
+\subsection{Sequencing}
+
+\subsubsection{\textsc{seq}}
+
+\typerule{seq}
+  {\Gamma;\; @\kappa;\; \alpha \vdash e_1 : () \at \rho_1 \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \alpha \vdash e_2 : T \at \rho_2 \dashv \Gamma_2}
+  {\Gamma;\; @\kappa;\; \alpha \vdash e_1;\; e_2 : T \at \rho_2 \dashv \Gamma_2}
+
+\subsection{Function Type Conversion}
+
+\subsubsection{\textsc{sync-to-async}}
+
+\typerule{sync-to-async}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\varphi\; () \to B \at \rho_f \dashv \Gamma'}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\varphi\; ()\; \mathit{async} \to B \at \rho_f \dashv \Gamma'}
+
+\subsubsection{\textsc{func-conv}}
+
+\typerule{func-conv}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma_1\; @\iota_1\; (A)\; \alpha' \to B \at \rho_f \dashv \Gamma' \\
+   \isoCoercion(@\sigma_1, @\iota_1, @\sigma_2, @\iota_2, \alpha') \\
+   \rho' = (\text{if } @\sigma_2 = @\textsf{Sendable} \text{ then } \mathunderscore \text{ else } \rho_f)}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma_2\; @\iota_2\; (A)\; \alpha' \to B \at \rho' \dashv \Gamma'}
+
+\subsubsection{\textsc{isolated-any-to-async}}
+
+\typerule{isolated-any-to-async}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma\; @\textsf{isolated(any)}\; () \to B \at \rho_f \dashv \Gamma' \\
+   \neg\isActorIsolated(@\iota_2) \\
+   \rho' = (\text{if } @\sigma = @\textsf{Sendable} \text{ then } \mathunderscore \text{ else } \rho_f)}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma\; @\iota_2\; ()\; \mathit{async} \to B \at \rho' \dashv \Gamma'}
+
+\subsubsection{Subtyping / Coercion Validation Table}
+
+The source account includes combined sync and async validation tables that explain which annotation changes are justified by direct coercion and which require closure wrapping. In this paper, those tables are conceptually split between Appendix~\ref{sec:appendix-relation} and the note below: Appendix~\ref{sec:appendix-relation} records the relation-level direct edges, while the present appendix records the term-level fact that some successful local conversions still require a freshly constructed closure.
+
+\subsubsection{Conversion by Closure Wrapping}
+
+Not every successful local conversion is a one-step coercion judgment. Some require an explicit new closure, for example when an actor parameter must be introduced or when a dynamic-isolation value must be called under \code{await} inside a freshly constructed closure. This note is part of the full function-conversion story and is therefore recorded explicitly here.
+
+\subsection{Region Merge}
+
+\subsubsection{\textsc{region-merge}}
+
+\typerule{region-merge}
+  {\Gamma;\; @\kappa;\; \alpha \vdash e_1 : T_1 \at \rho_1 \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \alpha \vdash e_2 : T_2 \at \rho_2 \dashv \Gamma_2 \\
+   T_1 : {\sim}\textsf{Sendable},\; T_2 : {\sim}\textsf{Sendable} \\
+   \rho_1, \rho_2 \in \rho_{\mathit{ns}} \\
+   \rho = \rho_1 \sqcup \rho_2}
+  {\Gamma;\; @\kappa;\; \alpha \vdash (e_1.\mathit{field} = e_2) : () \at \mathunderscore \dashv \Gamma_2[\rho_1 \mapsto \rho, \rho_2 \mapsto \rho]}
+
+\subsection{Calls}
+
+The call rules partition into four families: same-isolation, cross-isolation, explicit \code{@concurrent}, and caller-inheriting \code{@nonisolated async}. The rules below are printed in that order.
+
+\subsubsection{\textsc{call-nonsendable-noconsume}}
+
+\typerule{call-nonsendable-noconsume}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma\; @\iota\; ([\sending]\; A)\; \alpha' \to B \at \rho_f \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \alpha \vdash \mathit{arg} : A \at \rho_a \dashv \Gamma_2 \\
+   A : {\sim}\textsf{Sendable},\; B : \textsf{Sendable},\; @\iota \notin \{@\textsf{concurrent}\} \\
+   \canSend(@\kappa, @\iota, [\sending]) \\
+   \rho_a \in \Accessible(@\kappa) \\
+   \isActorIsolated(@\kappa) \land @\kappa = @\iota}
+  {\Gamma;\; @\kappa;\; \alpha \vdash [\code{await}]\; f(\mathit{arg}) : B \at \mathunderscore \dashv \Gamma_2}
+
+\subsubsection{\textsc{call-nonsendable-consume}}
+
+\typerule{call-nonsendable-consume}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma\; @\iota\; ([\sending]\; A)\; \alpha' \to B \at \rho_f \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \alpha \vdash \mathit{arg} : A \at \disconnected \dashv \Gamma_2 \\
+   A : {\sim}\textsf{Sendable},\; B : \textsf{Sendable},\; @\iota \notin \{@\textsf{concurrent}\} \\
+   \canSend(@\kappa, @\iota, [\sending]) \\
+   \neg(\isActorIsolated(@\kappa) \land @\kappa = @\iota)}
+  {\Gamma;\; @\kappa;\; \alpha \vdash [\code{await}]\; f(\mathit{arg}) : B \at \mathunderscore \dashv (\Gamma_2 \setminus \{\mathit{arg}\})}
+
+\subsubsection{\textsc{call-same-sync-sendable}}
+
+\typerule{call-same-sync-sendable}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma\; @\kappa\; (A) \to B \at \rho_f \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \alpha \vdash \mathit{arg} : A \at \mathunderscore \dashv \Gamma_2 \\
+   \rho \in \Accessible(@\kappa)}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f(\mathit{arg}) : B \at \rho \dashv \Gamma_2}
+
+\subsubsection{\textsc{call-same-async-sendable}}
+
+\typerule{call-same-async-sendable}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash f : @\sigma\; @\kappa\; (A)\; \mathit{async} \to B \at \rho_f \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \mathit{async} \vdash \mathit{arg} : A \at \mathunderscore \dashv \Gamma_2 \\
+   A : \textsf{Sendable} \\
+   \rho \in \Accessible(@\kappa)}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash \mathbf{await}\; f(\mathit{arg}) : B \at \rho \dashv \Gamma_2}
+
+\subsubsection{\textsc{call-same-nonsendable-merge}}
+
+\typerule{call-same-nonsendable-merge}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma\; @\kappa\; (A) \to B \at \rho_f \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \alpha \vdash \mathit{arg} : A \at \rho_a \dashv \Gamma_2 \\
+   A : {\sim}\textsf{Sendable} \\
+   \rho_a \in \Accessible(@\kappa) \\
+   \rho_{a'} = \rho_a \sqcup \toRegion(@\kappa) \\
+   \rho_b \in \Accessible(@\kappa),\; (B : \textsf{Sendable} \Rightarrow \rho_b = \mathunderscore)}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f(\mathit{arg}) : B \at \rho_b \dashv (\Gamma_2[\mathit{arg} \mapsto A \at \rho_{a'}])}
+
+\subsubsection{\textsc{call-cross-sendable}}
+
+\typerule{call-cross-sendable}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash f : @\sigma\; @\iota\; (A)\; \alpha \to B \at \rho_f \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \mathit{async} \vdash \mathit{arg} : A \at \mathunderscore \dashv \Gamma_2 \\
+   A : \textsf{Sendable},\; B : \textsf{Sendable},\; @\kappa \neq @\iota,\; @\iota \notin \{@\textsf{concurrent}, @\textsf{nonisolated}\}}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash \mathbf{await}\; f(\mathit{arg}) : B \at \mathunderscore \dashv \Gamma_2}
+
+\subsubsection{\textsc{call-cross-sending-result}}
+
+\typerule{call-cross-sending-result}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash f : @\sigma\; @\iota\; ()\; \alpha \to \sending\; B \at \rho_f \dashv \Gamma' \\
+   B : {\sim}\textsf{Sendable},\; @\kappa \neq @\iota,\; @\iota \notin \{@\textsf{concurrent}\}}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash \mathbf{await}\; f() : B \at \disconnected \dashv \Gamma'}
+
+\subsubsection{\textsc{call-cross-nonsending-result-error}}
+
+\typerule{call-cross-nonsending-result-error}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash f : @\sigma\; @\iota\; ()\; \alpha \to B \at \rho_f \dashv \Gamma_1 \\
+   B : {\sim}\textsf{Sendable},\; @\kappa \neq @\iota,\; @\iota \notin \{@\textsf{concurrent}\}}
+  {\text{derivation fails (compile error)}}
+
+\subsubsection{\textsc{call-concurrent-sendable}}
+
+\typerule{call-concurrent-sendable}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash f : @\sigma\; @\textsf{concurrent}\; (A)\; \mathit{async} \to B \at \rho_f \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \mathit{async} \vdash \mathit{arg} : A \at \mathunderscore \dashv \Gamma_2 \\
+   A : \textsf{Sendable},\; B : \textsf{Sendable}}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash \mathbf{await}\; f(\mathit{arg}) : B \at \mathunderscore \dashv \Gamma_2}
+
+\subsubsection{\textsc{call-concurrent-nonsendable}}
+
+\typerule{call-concurrent-nonsendable}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash f : @\sigma\; @\textsf{concurrent}\; (A)\; \mathit{async} \to B \at \rho_f \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \mathit{async} \vdash \mathit{arg} : A \at \disconnected \dashv \Gamma_2 \\
+   A : {\sim}\textsf{Sendable},\; B : \textsf{Sendable}}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash \mathbf{await}\; f(\mathit{arg}) : B \at \mathunderscore \dashv \Gamma_2}
+
+\subsubsection{\textsc{call-nonisolated-async-inherit}}
+
+\typerule{call-nonisolated-async-inherit}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash f : @\textsf{nonisolated}\; (A)\; \mathit{async} \to B \at \rho_f \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \mathit{async} \vdash \mathit{arg} : A \at \rho_a \dashv \Gamma_2}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash \mathbf{await}\; f(\mathit{arg}) : B \at \rho_b \dashv \Gamma_2}
+
+The unconstrained $\rho_b$ is intentional. A caller-inheriting nonisolated async function may return a fresh disconnected value or may return an alias of a task-bound input.
+
+\subsubsection{\textsc{call-nonisolated-sync}}
+
+\typerule{call-nonisolated-sync}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma\; @\textsf{nonisolated}\; (A) \to B \at \rho_f \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \alpha \vdash \mathit{arg} : A \at \rho_a \dashv \Gamma_2 \\
+   @\kappa \neq @\textsf{nonisolated} \\
+   \rho_a \in \Accessible(@\kappa) \\
+   \rho_b \in \Accessible(@\kappa),\; (B : \textsf{Sendable} \Rightarrow \rho_b = \mathunderscore)}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f(\mathit{arg}) : B \at \rho_b \dashv \Gamma_2}
+
+A nonisolated synchronous function called from an actor-isolated context executes within the caller's isolation domain without \code{await}. Neither argument consumption nor environment binding occurs. The result region~$\rho_b$ follows the same generalization as \textsc{call-same-nonsendable-merge}: \code{Sendable} results normalize to~$\mathunderscore$; non-\code{Sendable} results may be disconnected or actor-bound.
+
+\subsubsection{Explanatory Notes}
+
+\paragraph{\textsc{call-isolated-param-semantics}}
+Functions with an \code{isolated} parameter do not require a separate family of call rules. Instead, the passed actor instance determines the callee isolation, after which the existing same-isolation and cross-isolation rules apply in the ordinary way.
+
+\paragraph{\textsc{call-isolation-macro-semantics}}
+Calls that use \code{isolated (any Actor)? = \#isolation} are interpreted with a caller-provided same-isolation witness. This is why \code{\#isolation} enables non-\code{@Sendable} closure capture and mutable local access without introducing a cross-isolation boundary.
+
+\subsection{\code{@isolated(any)}}
+
+\subsubsection{\textsc{isolated-any-isolation-prop} (\code{f.isolation})}
+
+\typerule{isolated-any-isolation-prop}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\textsf{isolated(any)}\; () \to B \at \rho_f \dashv \Gamma'}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f.\mathit{isolation} : (\mathbf{any}\; \mathit{Actor})? \at \mathunderscore \dashv \Gamma'}
+
+This rule exposes the dynamic actor identity carried by an \code{@isolated(any)} value. Direct actor-aware construction paths may preserve that identity, while conversion through an ordinary nonisolated function type may erase it permanently.
+
+\subsection{Closures}
+
+\subsubsection{\textsc{closure-inherit-parent}}
+
+\typerule{closure-inherit-parent}
+  {@\kappa_{\mathit{eff}} = \effectiveClosureCapability(@\kappa, \{e\}) \\
+   \Gamma_{\mathit{captured}} \subseteq \Gamma \land \neg\isPassedToSendingParameter(\{e\}) \\
+   \forall (y : U \at \rho) \in \Gamma_{\mathit{captured}},\; \rho \in \Capturable(@\kappa_{\mathit{eff}}) \\
+   \Gamma_{\mathit{captured}};\; @\kappa_{\mathit{eff}};\; \alpha' \vdash e : B \at \rho_{\mathit{ret}} \dashv \Gamma'_{\mathit{cl}} \\
+   \rho_{\mathit{closure}} = \bigsqcup\{\rho \mid (y : T \at \rho) \in \Gamma_{\mathit{captured}} \land T : {\sim}\textsf{Sendable}\}}
+  {\Gamma;\; @\kappa;\; \alpha \vdash \{e\} : @\kappa_{\mathit{eff}}\; ()\; \alpha' \to B \at \rho_{\mathit{closure}} \dashv \Gamma}
+
+For global actors, $\effectiveClosureCapability$ keeps the inherited actor capability without requiring a captured actor value. For actor instances, it preserves instance isolation only when the isolated parameter or \code{self} is actually captured.
+
+\subsubsection{\textsc{closure-no-inherit-parent}}
+
+\typerule{closure-no-inherit-parent}
+  {\Gamma_{\mathit{captured}} \subseteq \Gamma \\
+   \neg\inheritActorContext(\{e\}) \land \neg\isPassedToSendingParameter(\{e\}) \\
+   \isAllSendable(\Gamma_{\mathit{captured}}) \\
+   @\kappa_{\mathit{cl}} = \toCapability(@\iota) \\
+   \Gamma_{\mathit{captured}};\; @\kappa_{\mathit{cl}};\; \alpha' \vdash e : B \at \rho_{\mathit{ret}} \dashv \Gamma'_{\mathit{cl}}}
+  {\Gamma;\; @\kappa;\; \alpha \vdash \{e\} : @\textsf{Sendable}\; @\iota\; ()\; \alpha' \to B \at \mathunderscore \dashv \Gamma}
+
+\subsubsection{\textsc{closure-sending-noconsume}}
+
+\typerule{closure-sending-noconsume}
+  {f : (\sending(@\kappa_{\mathit{cl}}\; ()\; \alpha' \to T)) \to R \\
+   \Gamma_{\mathit{captured}} \subseteq \Gamma \\
+   \inheritActorContext(\{e\}) \land \isActorIsolated(@\kappa) \land @\kappa_{\mathit{cl}} = @\kappa \\
+   \forall (x : U \at \rho) \in \Gamma_{\mathit{captured}},\; \rho \in \Capturable(@\kappa) \\
+   \Gamma_{\mathit{captured}};\; @\kappa_{\mathit{cl}};\; \alpha' \vdash e : T \at \rho_{\mathit{ret}} \dashv \Gamma'_{\mathit{cl}}}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f(\{e\}) : R \at \mathunderscore \dashv \Gamma}
+
+\subsubsection{\textsc{closure-sending-consume}}
+
+\typerule{closure-sending-consume}
+  {f : (\sending(@\kappa_{\mathit{cl}}\; ()\; \alpha' \to T)) \to R \\
+   \Gamma_{\mathit{captured}} \subseteq \Gamma \\
+   \neg(\inheritActorContext(\{e\}) \land \isActorIsolated(@\kappa) \land @\kappa_{\mathit{cl}} = @\kappa) \\
+   \forall (x : U \at \rho) \in \Gamma_{\mathit{captured}}.\; (U : \textsf{Sendable}) \lor (U : {\sim}\textsf{Sendable} \land \rho = \disconnected) \\
+   \Gamma_{\mathit{captured}};\; @\kappa_{\mathit{cl}};\; \alpha' \vdash e : T \at \rho_{\mathit{ret}} \dashv \Gamma'_{\mathit{cl}} \\
+   \Gamma' = \Gamma \setminus \{x \mid (x : U \at \disconnected) \in \Gamma_{\mathit{captured}} \land U : {\sim}\textsf{Sendable}\}}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f(\{e\}) : R \at \mathunderscore \dashv \Gamma'}
+
+This rule is the transfer-side counterpart of \textsc{call-nonsendable-consume}: the sent closure leaves the caller, so disconnected non-\code{Sendable} captures are removed from the caller environment unless same concrete actor inheritance proves the non-consuming branch.
+
+\subsection{Async Let}
+
+\subsubsection{\textsc{async-let}}
+
+\typerule{async-let}
+  {\Gamma_{\mathit{captured}} \subseteq \Gamma \\
+   \forall (y : U \at \rho) \in \Gamma_{\mathit{captured}}.\; (U : \textsf{Sendable}) \lor (U : {\sim}\textsf{Sendable} \land \rho = \disconnected) \\
+   \Gamma_{\mathit{captured}};\; @\textsf{nonisolated};\; \mathit{async} \vdash \mathit{expr} : T \at \rho_{\mathit{init}} \dashv \Gamma'_{\mathit{child}} \\
+   \Gamma_{\mathit{sent}} = \Gamma \setminus \{y \mid (y : U \at \disconnected) \in \Gamma_{\mathit{captured}} \land U : {\sim}\textsf{Sendable}\} \\
+   \rho_x = (\text{if } T : \textsf{Sendable} \text{ then } \mathunderscore \text{ else } \disconnected)}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash \mathbf{async\; let}\; x = \mathit{expr} \dashv \Gamma_{\mathit{sent}},\; x : T \at \rho_x}
+
+The initializer is wrapped in an implicit nonisolated async autoclosure that forms a child task boundary. Because the conclusion already requires ambient mode~$\mathit{async}$, \code{async let} is available only in async contexts. Non-\code{Sendable} captures must be disconnected and are temporarily consumed. The output environment~$\Gamma'_{\mathit{child}}$ records which captures survive cross-isolation calls within the child task body.
+
+\subsubsection{\textsc{async-let-access}}
+
+\typerule{async-let-access}
+  {(x : T \at \rho) \in \Gamma \quad \isAsyncLet(x) \\
+   \Gamma' = \undosend(\Gamma, x)}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash \mathbf{await}\; x : T \at \rho \dashv \Gamma'}
+
+Accessing an \code{async let} binding requires \code{await} (and \code{try} if the initializer can throw). The $\undosend$ function restores captures that were not consumed by cross-isolation within the child task: $\undosend(\Gamma, x) = \Gamma \cup \{y : U \at \disconnected \mid y \in \mathit{sent}_{\text{async-let}}(x) \land y \in \mathrm{dom}(\Gamma'_{\mathit{child}})\}$. Here $\mathrm{dom}(\Gamma)$ denotes the domain of environment~$\Gamma$, i.e.\ the set of variable names $y$ such that $\exists T, \rho.\; y : T \at \rho \in \Gamma$. This is what distinguishes \code{async let} from permanent \code{sending}-based transfer.
+
+\subsection{Sendable Inference}
+
+\subsubsection{\textsc{infer-sendable-nonlocal}}
+
+\typerule{infer-sendable-nonlocal}
+  {\isNonLocal(f) \\ f : (A_1, \ldots, A_n)\; \alpha \to R}
+  {\Gamma;\; @\kappa;\; \alpha' \vdash f : @\textsf{Sendable}\; (A_1, \ldots, A_n)\; \alpha \to R \at \mathunderscore \dashv \Gamma}
+
+\subsubsection{\textsc{infer-sendable-method-sendable}}
+
+\typerule{infer-sendable-method-sendable}
+  {T : \textsf{Sendable} \\ m \in \instanceMethods(T) \\ m : (A_1, \ldots, A_n)\; \alpha \to R}
+  {\Gamma;\; @\kappa;\; \alpha' \vdash T.m : @\textsf{Sendable}\; (T) \to @\textsf{Sendable}\; ((A_1, \ldots, A_n)\; \alpha \to R) \at \mathunderscore \dashv \Gamma}
+
+\subsubsection{\textsc{infer-sendable-method-non-sendable}}
+
+\typerule{infer-sendable-method-non-sendable}
+  {T : {\sim}\textsf{Sendable} \\ m \in \instanceMethods(T) \\ m : (A_1, \ldots, A_n)\; \alpha \to R}
+  {\Gamma;\; @\kappa;\; \alpha' \vdash T.m : @\textsf{Sendable}\; (T) \to ((A_1, \ldots, A_n)\; \alpha \to R) \at \mathunderscore \dashv \Gamma}
+
+\subsubsection{\textsc{infer-sendable-keypath}}
+
+\typerule{infer-sendable-keypath}
+  {\mathit{kp} = \mathit{KeyPath}(T, \mathit{path}) \\
+   \neg\hasIsolatedKeyPathComponent(\mathit{kp}) \\
+   \isAllSendable(\mathit{captures}(\mathit{kp}))}
+  {\Gamma;\; @\kappa;\; \alpha \vdash \mathit{kp} : \mathbf{any}\; \mathit{KeyPath}\langle T, V\rangle\; \&\; \textsf{Sendable} \at \mathunderscore \dashv \Gamma}

@@ -1,0 +1,137 @@
+\section{A Kernel of Typing Rules}
+\label{sec:kernel}
+
+Appendix~\ref{sec:appendix-full} prints the complete rule inventory. The main body needs only the rules that explain the recurring behaviors. Those rules fall into four groups: access and binding, transfer, closure inference, and dynamic isolation.
+
+\subsection{Access and Same-Isolation Binding}
+
+\begin{rulebox}{Variable access depends on capability and region}
+\typerule{var}
+  {x : T \at \rho \in \Gamma \\ \rho \in \Accessible(@\kappa)}
+  {\Gamma;\; @\kappa;\; \alpha \vdash x : T \at \rho \dashv \Gamma}
+\end{rulebox}
+
+The \textsc{var} rule is intentionally mundane. Its purpose is to make the separation explicit: access is legal not merely because $x$ has type~$T$, but because the current capability can directly access the region in which $x$ currently lives.
+
+\begin{rulebox}{Same-isolation ordinary call refines the caller environment}
+\typerule{call-same-nonsendable-merge}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma\; @\kappa\; (A) \to B \at \rho_f \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \alpha \vdash \mathit{arg} : A \at \rho_a \dashv \Gamma_2 \\
+   A : {\sim}\textsf{Sendable} \\
+   \rho_a \in \Accessible(@\kappa) \\
+   \rho'_a = \rho_a \sqcup \toRegion(@\kappa) \\
+   \rho_b \in \Accessible(@\kappa),\; (B : \textsf{Sendable} \Rightarrow \rho_b = \mathunderscore)}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f(\mathit{arg}) : B \at \rho_b \dashv (\Gamma_2[\mathit{arg} \mapsto A \at \rho'_a])}
+\end{rulebox}
+
+This rule explains one of the paper's most important phenomena: same-isolation use does not imply stasis. A disconnected value passed to an ordinary same-isolation non-\code{sending} parameter may become actor-bound after the call. The value is still usable in the caller, but not under the same preconditions as before. That is why later transfer can fail even without any explicit consume. The result region~$\rho_b$ generalizes naturally: when $B$ is \code{Sendable} it normalizes to~$\mathunderscore$; when $B$ is non-\code{Sendable} it may be \code{disconnected} (fresh value) or actor-bound (actor state).
+
+The same join operation also governs assignment and aliasing through \textsc{region-merge}. The paper does not treat assignment as destruction; it treats it as refinement of the environment's region facts.
+
+\subsection{Transfer Depends on More Than the Keyword \code{sending}}
+
+\begin{rulebox}{Same-isolation \code{sending} without consumption}
+\typerule{call-nonsendable-noconsume}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma\; @\iota\; ([\sending]\; A)\; \alpha' \to B \at \rho_f \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \alpha \vdash \mathit{arg} : A \at \rho_a \dashv \Gamma_2 \\
+   A : {\sim}\textsf{Sendable},\; B : \textsf{Sendable},\; @\iota \notin \{@\textsf{concurrent}\} \\
+   \canSend(@\kappa, @\iota, [\sending]) \\
+   \rho_a \in \Accessible(@\kappa) \\
+   \isActorIsolated(@\kappa) \land @\kappa = @\iota}
+  {\Gamma;\; @\kappa;\; \alpha \vdash [\code{await}]\; f(\mathit{arg}) : B \at \mathunderscore \dashv \Gamma_2}
+\end{rulebox}
+
+\begin{rulebox}{Cross-isolation transfer consumes the caller binding}
+\typerule{call-nonsendable-consume}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma\; @\iota\; ([\sending]\; A)\; \alpha' \to B \at \rho_f \dashv \Gamma_1 \\
+   \Gamma_1;\; @\kappa;\; \alpha \vdash \mathit{arg} : A \at \disconnected \dashv \Gamma_2 \\
+   A : {\sim}\textsf{Sendable},\; B : \textsf{Sendable},\; @\iota \notin \{@\textsf{concurrent}\} \\
+   \canSend(@\kappa, @\iota, [\sending]) \\
+   \neg(\isActorIsolated(@\kappa) \land @\kappa = @\iota)}
+  {\Gamma;\; @\kappa;\; \alpha \vdash [\code{await}]\; f(\mathit{arg}) : B \at \mathunderscore \dashv (\Gamma_2 \setminus \{\mathit{arg}\})}
+\end{rulebox}
+
+These two rules express the paper's central contrast. \code{sending} marks a transfer-capable boundary, not an unconditional consume~\cite{se0430}. If caller and callee share the same concrete actor isolation, the value remains in the caller environment with its original region. If that same-isolation proof fails, the argument must be disconnected and is removed from the caller environment after the call.
+
+\begin{definitionbox}{Parameter and result positions are asymmetric}
+For parameters, cross-isolation transfer is safe because the caller can relinquish the binding and the type system can record that fact by shrinking~$\Gamma$. Results move in the opposite direction. A cross-isolation non-\code{Sendable} result is therefore legal only when the callee explicitly promises \code{sending}~$B$, which yields a disconnected value in the caller. Without that promise, derivation fails.
+\end{definitionbox}
+
+This result-side asymmetry is not cosmetic. It explains why cross-isolation calls allow implicit transfer of disconnected arguments yet reject ordinary non-\code{Sendable} return values without explicit \code{sending}~\cite{se0430}.
+
+\begin{propositionbox}{\code{@concurrent}, \code{@nonisolated async}, and \code{@nonisolated sync} are separate transfer stories}
+\code{@concurrent async} requires a non-\code{Sendable} argument to be disconnected, but it does not consume that argument because the call is modeled as a callability check rather than as actor-to-actor transfer. By contrast, \code{@nonisolated async} after SE-0461 inherits caller execution for non-\code{sending} calls and therefore preserves the caller-side argument region. Its results are more subtle: a freshly constructed non-\code{Sendable} result may be disconnected, but a returned input may remain task-bound rather than transfer-ready~\cite{se0461}. A \code{@nonisolated sync} function called from an actor-isolated context is the simplest case: it executes on the caller's executor with no isolation boundary, requiring neither \code{await} nor argument consumption, so the environment is preserved exactly as-is.
+\end{propositionbox}
+
+\subsection{Closure Inference Splits on Sendability and Capture}
+
+\begin{rulebox}{Parent-inheriting closure}
+\typerule{closure-inherit-parent}
+  {@\kappa_{\mathit{eff}} = \effectiveClosureCapability(@\kappa, \{e\}) \\
+   \Gamma_{\mathit{captured}} \subseteq \Gamma \land \neg\isPassedToSendingParameter(\{e\}) \\
+   \forall (y : U \at \rho) \in \Gamma_{\mathit{captured}},\; \rho \in \Capturable(@\kappa_{\mathit{eff}}) \\
+   \Gamma_{\mathit{captured}};\; @\kappa_{\mathit{eff}};\; \alpha' \vdash e : B \at \rho_{\mathit{ret}} \dashv \Gamma'_{\mathit{cl}} \\
+   \rho_{\mathit{closure}} = \bigsqcup\{\rho \mid (y : T \at \rho) \in \Gamma_{\mathit{captured}} \land T : {\sim}\textsf{Sendable}\}}
+  {\Gamma;\; @\kappa;\; \alpha \vdash \{e\} : @\kappa_{\mathit{eff}}()\; \alpha' \to B \\
+   \at \rho_{\mathit{closure}} \dashv \Gamma}
+\end{rulebox}
+
+\begin{rulebox}{\code{@Sendable} closure without parent inheritance}
+\typerule{closure-no-inherit-parent}
+  {\Gamma_{\mathit{captured}} \subseteq \Gamma
+   \quad \neg\inheritActorContext(\{e\}) \land \neg\isPassedToSendingParameter(\{e\}) \\
+   \isAllSendable(\Gamma_{\mathit{captured}})
+   \quad @\kappa_{\mathit{cl}} = \toCapability(@\iota) \\
+   \Gamma_{\mathit{captured}};\; @\kappa_{\mathit{cl}};\; \alpha' \vdash e : B \at \rho_{\mathit{ret}} \dashv \Gamma'_{\mathit{cl}}}
+  {\Gamma;\; @\kappa;\; \alpha \vdash \{e\} : @\textsf{Sendable}\; @\iota\; ()\; \alpha' \to B \at \mathunderscore \dashv \Gamma}
+\end{rulebox}
+
+This pair of rules explains the motivating example from the introduction. Non-\code{@Sendable} closures inherit effective parent capability. \code{@Sendable} closures do not; they are checked under the capability implied by their own annotation. The split is conceptually simple, but it has two subtle consequences.
+
+\begin{itemize}
+  \item \code{@Sendable} constrains capture rather than directly describing execution. That is why a \code{@Sendable @MainActor} closure is legal: it is sendable as a value, yet its body still executes under \code{@MainActor}.
+  \item Actor-instance inheritance is capture-sensitive. A global-actor closure keeps global actor isolation without capturing a concrete actor value, but a closure inside an actor method or under an \code{isolated} parameter keeps instance isolation only if \code{self} or the isolated parameter is actually captured.
+\end{itemize}
+
+\begin{propositionbox}{Sending a closure revives the same-isolation versus transfer split}
+When a closure itself is passed through a \code{sending} parameter, the same distinction appears at the capture level. Same concrete actor inheritance, such as \code{Task \{ \ldots \}} in an actor-isolated caller with \code{@\_inheritActorContext}, preserves captures. Transfer cases, such as \code{Task.detached} or nonisolated callers, require non-\code{Sendable} captures to be disconnected and consume them from the caller environment.
+\end{propositionbox}
+
+This is why the folklore claim ``tasks always consume captures'' is false. What matters is whether the sent closure still has same concrete actor isolation evidence.
+
+\subsection{Structured Concurrency: \code{async let}}
+
+\begin{rulebox}{\code{async let} declares a child task with temporary capture consumption}
+\typerule{async-let}
+  {\Gamma_{\mathit{captured}} \subseteq \Gamma \\
+   \forall (y : U \at \rho) \in \Gamma_{\mathit{captured}}.\; (U : \textsf{Sendable}) \lor (U : {\sim}\textsf{Sendable} \land \rho = \disconnected) \\
+   \Gamma_{\mathit{captured}};\; @\textsf{nonisolated};\; \mathit{async} \vdash \mathit{expr} : T \at \rho_{\mathit{init}} \dashv \Gamma'_{\mathit{child}} \\
+   \Gamma_{\mathit{sent}} = \Gamma \setminus \{y \mid (y : U \at \disconnected) \in \Gamma_{\mathit{captured}} \land U : {\sim}\textsf{Sendable}\} \\
+   \rho_x = (\text{if } T : \textsf{Sendable} \text{ then } \mathunderscore \text{ else } \disconnected)}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash \mathbf{async\; let}\; x = \mathit{expr} \dashv \Gamma_{\mathit{sent}},\; x : T \at \rho_x}
+\end{rulebox}
+
+\begin{rulebox}{\code{async let} access restores non-consumed captures}
+\typerule{async-let-access}
+  {(x : T \at \rho) \in \Gamma \quad \isAsyncLet(x) \\
+   \Gamma' = \undosend(\Gamma, x)}
+  {\Gamma;\; @\kappa;\; \mathit{async} \vdash \mathbf{await}\; x : T \at \rho \dashv \Gamma'}
+\end{rulebox}
+
+These two rules capture the novel semantics of \code{async let}. The initializer is type-checked under $@\textsf{nonisolated}; \mathit{async}$, creating a child task boundary. Because the conclusion already requires ambient mode~$\mathit{async}$, \code{async let} is available only in async contexts. Non-\code{Sendable} captures must be disconnected and are temporarily consumed (removed from~$\Gamma$). Unlike \code{Task.init}, which can inherit the caller's actor isolation through \code{@\_inheritActorContext} and thereby preserve captures, \code{async let} always acts as a nonisolated boundary.
+
+The $\undosend$ function distinguishes \code{async let} from ordinary \code{sending}-based transfer. At \code{await}~$x$, the SIL region analysis restores captures that were not consumed by cross-isolation within the child task body. Formally: $\undosend(\Gamma, x) = \Gamma \cup \{y : U \at \disconnected \mid y \in \mathit{sent}_{\text{async-let}}(x) \land y \in \mathrm{dom}(\Gamma'_{\mathit{child}})\}$. Here $\mathrm{dom}(\Gamma)$ denotes the domain of environment~$\Gamma$, i.e.\ the set of variable names $y$ such that $\exists T, \rho.\; y : T \at \rho \in \Gamma$. When the initializer makes only same-isolation calls (e.g.\ a nonisolated function), $\Gamma'_{\mathit{child}}$ retains all captures and $\undosend$ fully restores them. When the initializer crosses isolation boundaries (e.g.\ calling a \code{@MainActor} function), those captures are consumed within $\Gamma'_{\mathit{child}}$ and remain unavailable after \code{await}.
+
+\subsection{Dynamic Isolation Requires an Explicit Bridge}
+
+\begin{rulebox}{\code{@isolated(any)} sync-to-async bridge}
+\typerule{isolated-any-to-async}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma\; @\textsf{isolated(any)}\; () \to B \at \rho_f \dashv \Gamma' \\
+   \neg\isActorIsolated(@\iota_2) \\
+   \rho' = (\text{if } @\sigma = @\textsf{Sendable} \text{ then } \mathunderscore \text{ else } \rho_f)}
+  {\Gamma;\; @\kappa;\; \alpha \vdash f : @\sigma\; @\iota_2\; ()\; \mathit{async} \to B \at \rho' \dashv \Gamma'}
+\end{rulebox}
+
+The bridge exists because \code{@isolated(any)} values carry actor identity dynamically~\cite{se0431}. A sync-looking value of type \code{@isolated(any) () -> B} must still be callable through cross-isolation conventions, and those conventions are async. The same dynamic information also explains the observable property \code{f.isolation}: some construction paths preserve actor identity, while others erase it permanently by converting through an ordinary nonisolated function type.
+
+Taken together, the rules in this section explain why Swift Concurrency diagnostics often feel related even when they appear in different syntactic corners. Access, binding, transfer, capture, and dynamic calling conventions are not separate ad hoc mechanisms. They are different projections of one capability-region discipline with affine update.

@@ -1,0 +1,6 @@
+# Marp configuration — use local assets for offline support
+options:
+  emoji:
+    unicode: true
+  math:
+    katexFontPath: 'assets/fonts/'

@@ -1,0 +1,230 @@
+/**
+ * @theme tryswift
+ * @auto-scaling true
+ * @size 4:3 960px 720px
+ * @size 16:9 1280px 720px
+ * @size 4K 3840px 2160px
+ */
+@import 'uncover';
+
+:root {
+  --font-header: "Avenir Next", "Helvetica Neue", "Segoe UI", sans-serif;
+  --font-section: "Avenir Next", "Helvetica Neue", "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", "Fira Code", "Cascadia Code", "Menlo", monospace;
+}
+
+section {
+  --color-background: #1a1a2e;
+  --color-background-code: rgba(255, 255, 255, 0.1);
+  --color-foreground: #e0e0e0;
+  font-family: var(--font-section);
+  font-size: 36px;
+  background-color: #1a1a2e;
+  color: #e0e0e0;
+}
+
+h1, h2, h3 {
+  font-family: var(--font-header);
+  color: #ffffff;
+}
+
+h1 code, h2 code, h3 code {
+  font-size: inherit;
+}
+
+code {
+  font-family: var(--font-mono);
+  font-size: 24px;
+}
+
+section :not(pre) > code {
+  border-radius: 4px;
+  padding: 0.1em 0.3em;
+}
+
+pre code {
+  font-size: 22px;
+  padding: 0.8em 1em !important;
+}
+
+.katex {
+  font-size: 1.1em;
+}
+
+section.lead {
+  text-align: center;
+}
+
+section.lead h1 {
+  font-size: 80px;
+  line-height: 1.1;
+}
+
+section.lead h2 {
+  font-size: 36px;
+  font-weight: normal;
+  color: #aaa;
+}
+
+section.small-code pre code {
+  font-size: 18px;
+}
+
+section.tiny-code pre code {
+  font-size: 16px;
+}
+
+table {
+  font-size: 24px;
+}
+
+.columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+}
+
+h1 {
+  font-size: 64px;
+}
+
+h2 {
+  font-size: 48px;
+}
+
+p {
+  font-size: 32px;
+}
+
+ul, ol {
+  display: inline-block;
+  text-align: left;
+}
+
+em {
+  color: #ff79c6;
+}
+
+strong {
+  color: #8be9fd;
+}
+
+section.diagram pre {
+  font-size: 16px;
+}
+
+section.big-picture pre code {
+  font-size: 17px;
+}
+
+/* Xcode Dark theme syntax highlighting */
+.hljs-keyword,
+.hljs-selector-tag {
+  color: #FF7AB2;
+  font-weight: bold;
+}
+
+.hljs-string,
+.hljs-addition {
+  color: #FC6A5D;
+}
+
+.hljs-type,
+.hljs-name,
+.hljs-section,
+.hljs-selector-class,
+.hljs-selector-id,
+.hljs-title {
+  color: #ACF2E4;
+}
+
+.hljs-built_in,
+.hljs-tag {
+  color: #67B7A4;
+}
+
+.hljs-comment,
+.hljs-quote {
+  color: #6C7986;
+  font-style: italic;
+}
+
+.hljs-number,
+.hljs-literal,
+.hljs-bullet,
+.hljs-link,
+.hljs-regexp {
+  color: #D0BF69;
+}
+
+.hljs-meta,
+.hljs-symbol,
+.hljs-template-variable,
+.hljs-attribute {
+  color: #FFA14F;
+}
+
+.hljs-variable,
+.hljs-deletion {
+  color: #A79DF8;
+}
+
+.hljs-params {
+  color: #DFDFE0;
+}
+
+
+/* Spacing around KaTeX display math (override Marp's `section .katex-display{margin:0}`) */
+section .katex-display {
+  margin: 0.8em 0 1.2em 0 !important;
+}
+
+/* Spacing between blockquote, code blocks, and text */
+section blockquote {
+  margin-bottom: 2em !important;
+}
+section pre + p {
+  margin-top: 1.5em !important;
+}
+
+/* Blockquote: bring decorative quotes closer to text */
+blockquote::before {
+  left: 10% !important;
+}
+blockquote::after {
+  right: 10% !important;
+}
+
+/* Even tighter quotes (use with _class: tight-quote) */
+section.tight-quote blockquote::before {
+  left: 20% !important;
+}
+section.tight-quote blockquote::after {
+  right: 20% !important;
+}
+
+/* Inline code syntax coloring utilities */
+.kw { color: #FF7AB2; font-weight: bold; }
+.ty { color: #ACF2E4; }
+.at { color: #FFA14F; }
+.str { color: #FC6A5D; }
+.cm { color: #6C7986; font-style: italic; }
+.num { color: #D0BF69; }
+
+/* Footnote */
+.footnote {
+  position: absolute;
+  bottom: 40px;
+  left: 60px;
+  right: 60px;
+  font-size: 18px;
+  color: #999;
+}
+
+section.small-text p,
+section.small-text ul,
+section.small-text ol,
+section.small-text li,
+section.small-text code {
+  font-size: 24px;
+}

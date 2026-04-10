@@ -1,0 +1,89 @@
+%%{init: {"flowchart": {"defaultRenderer": "elk"}} }%%
+flowchart BT
+    subgraph Isolation["Isolation Conversion"]
+        direction BT
+
+        %% Async Types
+        subgraph Async["Async Conversion"]
+            subgraph NonSendableAsync["Non-Sendable Async"]
+                N2["nonisolated async"]
+                C2["@concurrent async"]
+                IA2["@isolated(any) async"]
+            end
+
+            subgraph SendableAsync["Sendable Async"]
+                S2["nonisolated @Sendable async"]
+                M2["@MainActor (@Sendable) async"]
+                CS2["@concurrent @Sendable async"]
+                IAS2["@isolated(any) @Sendable async"]
+                ILS2["isolated LocalActor @Sendable async"]
+            end
+
+            IL2["isolated LocalActor async"]
+        end
+
+        %% Sync Types
+        subgraph Sync["Sync Conversion"]
+            IA1["@isolated(any) sync"]
+            N1["nonisolated sync"]
+
+            subgraph SendableSync["Sendable Sync"]
+                S1["nonisolated @Sendable sync"]
+                MS1["@MainActor (@Sendable) sync"]
+                IAS1["@isolated(any) @Sendable sync"]
+                ILS1["isolated LocalActor @Sendable sync"]
+            end
+
+            IL1["isolated LocalActor sync"]
+        end
+
+        %% @isolated(any) deprecated conversion
+        IA1 -.->|"⚠️ deprecated"| N1
+
+        %% Core sync relationships - define IA1 as target to place it higher
+        N1 --> IA1
+        IAS1 --> IA1
+        S1 --> MS1
+        S1 --> N1
+        MS1 --> IAS1
+
+        %% isolated LocalActor branch
+        S1 --> ILS1 --> IL1
+
+        %% Non-Sendable async
+        N2 <--> C2
+        C2 <--> IA2
+
+        %% isolated LocalActor → Non-Sendable async
+        %% NOTE: IL2 CANNOT convert to N2/C2/IA2 because it has `isolated LocalActor` parameter
+        %% that cannot be provided when converting to 0-ary functions
+
+        %% Sendable equivalences
+        S2 <--> M2
+        S2 <--> CS2
+        S2 <--> IAS2
+        %% NOTE: ILS2 has `isolated LocalActor` param, so ILS2 -> S2 is NOT possible
+        S2 --> ILS2
+
+        %% Sendable → Non-Sendable async
+        M2 --> N2
+        CS2 --> C2
+        IAS2 --> IA2
+
+        %% Sendable → isolated LocalActor
+        ILS2 --> IL2
+
+        %% Group-level sync-to-async conversion
+        Sync -->|"Async Lift"| Async
+    end
+
+    %% Async bidirectional edges color (N2↔C2, C2↔IA2, S2↔M2/CS2/IAS2)
+    linkStyle 8,9,10,11,12 stroke:red,stroke-width:3px;
+
+    %% Group-level Async Lift edge color
+    linkStyle 18 stroke:blue,stroke-width:3px,color:blue;
+
+    %% Dashed border for Sendable/Non-Sendable boxes
+    style NonSendableAsync stroke-dasharray: 5 5
+    style SendableAsync stroke-dasharray: 5 5
+    style SendableSync stroke-dasharray: 5 5

@@ -1,0 +1,148 @@
+\section{Notation and Auxiliary Definitions}
+\label{sec:appendix-notation}
+
+This appendix collects the auxiliary definitions that the main body uses selectively and the full rule catalog depends on throughout.
+
+\subsection{Judgment Forms}
+
+\[
+  \Gamma;\; @\kappa;\; \alpha \vdash e : T \at \rho \dashv \Gamma'
+\]
+
+\[
+  \Delta \vdash_d \mathit{decl}
+\]
+
+\begin{itemize}
+  \item $\Gamma$ / $\Gamma'$: input and output environments
+  \item $@\kappa$: current execution capability
+  \item $\alpha$: ambient mode, either $\mathit{sync}$ or $\mathit{async}$
+  \item $\rho$: result region
+  \item $\Delta$: declaration environment used only to decide how bodies are checked
+\end{itemize}
+
+The declaration judgment does not produce a value type. Its role is to determine the capability and ambient mode under which a function or task body is checked.
+
+\subsection{Capability and Function Annotations}
+
+\[
+\begin{aligned}
+  @\kappa &::= @\textsf{nonisolated} \mid @\isolated(a) \\
+  @\sigma &::= \cdot \mid @\textsf{Sendable} \\
+  @\iota &::= @\kappa \mid @\textsf{isolated(any)} \mid @\textsf{concurrent} \\
+  @\varphi &::= @\sigma\; @\iota
+\end{aligned}
+\]
+
+\[
+\begin{aligned}
+  \toCapability(@\kappa) &= @\kappa \\
+  \toCapability(@\textsf{isolated(any)}) &= @\textsf{nonisolated} \\
+  \toCapability(@\textsf{concurrent}) &= @\textsf{nonisolated} \\
+  \isActorIsolated(@\kappa) &\iff @\kappa \notin \{@\textsf{nonisolated}\}
+\end{aligned}
+\]
+
+The split between $@\sigma$ and $@\iota$ is deliberate. \code{@Sendable} constrains capture, while $@\iota$ determines body capability. \code{@concurrent} and caller-inheriting nonisolated async functions therefore agree on body capability and diverge only at call sites.
+
+\subsection{Regions, Normal Forms, and Merge}
+
+\[
+\begin{aligned}
+  \rho_{\mathit{ns}} &::= \disconnected \mid \isolated(a) \mid \task \mid \invalid \\
+  \rho &::= \rho_{\mathit{ns}} \mid \mathunderscore
+\end{aligned}
+\]
+
+\[
+  \forall (x : T \at \rho) \in \Gamma.\; (T : \textsf{Sendable} \Leftrightarrow \rho = \mathunderscore)
+\]
+
+$\mathunderscore$ is the normalized region tag for \code{Sendable} values. Region merge ranges only over $\rho_{\mathit{ns}}$.
+
+\[
+\begin{aligned}
+  \Accessible(@\textsf{nonisolated}) &= \{\disconnected, \task, \mathunderscore\} \\
+  \Accessible(@\isolated(a)) &= \{\disconnected, \isolated(a), \task, \mathunderscore\} \\
+  \Capturable(@\textsf{nonisolated}) &= \{\disconnected, \task, \mathunderscore\} \\
+  \Capturable(@\isolated(a)) &= \{\disconnected, \isolated(a), \mathunderscore\}
+\end{aligned}
+\]
+
+The difference between $\Accessible$ and $\Capturable$ is concentrated in $\task$: task-bound values may be directly readable in some actor-isolated contexts but may not be captured into actor-isolated closures.
+
+\[
+\begin{aligned}
+  \toRegion(@\isolated(a)) &= \isolated(a) \\
+  \toRegion(@\textsf{nonisolated}) &= \disconnected
+\end{aligned}
+\]
+
+\[
+\begin{aligned}
+  \disconnected \sqcup \disconnected &= \disconnected \\
+  \disconnected \sqcup \isolated(a) &= \isolated(a) \\
+  \disconnected \sqcup \task &= \task \\
+  \isolated(a) \sqcup \isolated(a) &= \isolated(a) \\
+  \isolated(a) \sqcup \isolated(b) &= \invalid \text{ for } a \neq b \\
+  \isolated(a) \sqcup \task &= \invalid \\
+  \task \sqcup \task &= \task
+\end{aligned}
+\]
+
+\subsection{Closure Support}
+
+\[
+  \isAllSendable(\Gamma_{\mathit{captured}})
+    \iff \forall (x : T \at \rho) \in \Gamma_{\mathit{captured}}.\; T : \textsf{Sendable}
+\]
+
+\[
+\begin{aligned}
+  \inheritActorContext(\mathit{closure}) &: \mathit{Bool} \\
+  \isPassedToSendingParameter(\mathit{closure}) &: \mathit{Bool} \\
+  \capturesIsolatedParam(\mathit{closure}) &: \mathit{Bool}
+\end{aligned}
+\]
+
+\[
+\begin{aligned}
+  \effectiveClosureCapability(@\textsf{nonisolated}, \mathit{closure}) &= @\textsf{nonisolated} \\
+  \effectiveClosureCapability(@\isolated(\mathit{globalActor}), \mathit{closure}) &= @\isolated(\mathit{globalActor})
+\end{aligned}
+\]
+
+\[
+\begin{aligned}
+  \mathit{ECC}_{\mathit{local}}(\mathit{closure})
+    &= @\isolated(\mathit{localActor})
+      \quad \text{if } \capturesIsolatedParam(\mathit{closure}) \\
+  \mathit{ECC}_{\mathit{local}}(\mathit{closure})
+    &= @\textsf{nonisolated}
+      \quad \text{otherwise}
+\end{aligned}
+\]
+
+Here, $\mathit{ECC}_{\mathit{local}}(\mathit{closure})$ abbreviates $\effectiveClosureCapability(@\isolated(\mathit{localActor}), \mathit{closure})$. The final clause is the critical actor-instance branch: local actor isolation is preserved only when the isolated parameter or \code{self} is actually captured.
+
+\subsection{Transfer and Sendable Inference Support}
+
+\[
+\begin{aligned}
+  [\sending] &::= \sending \mid \cdot \\
+  \canSend(@\kappa, @\iota, [\sending]) &\iff [\sending] \in \{\sending\} \lor (@\kappa \neq @\iota \land @\iota \notin \{@\textsf{nonisolated}\})
+\end{aligned}
+\]
+
+This predicate unifies explicit \code{sending} and implicit cross-isolation transfer.
+
+\[
+\begin{aligned}
+  \isNonLocal(f) &: \mathit{Bool} \\
+  \instanceMethods(T) &: \mathit{Set}\langle\mathit{MethodDecl}\rangle \\
+  \hasIsolatedKeyPathComponent(\mathit{kp}) &: \mathit{Bool} \\
+  \isAllSendable(\mathit{captures}(\mathit{kp})) &: \mathit{Bool}
+\end{aligned}
+\]
+
+These definitions support the Sendable-inference rules for top-level functions, static methods, unapplied instance-method references, and key-path literals.

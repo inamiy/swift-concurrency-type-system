@@ -1,0 +1,1079 @@
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+class NonSendable {
+  @_hasStorage @_hasInitialValue var value: Int { get set }
+  init(value: Int = 0)
+  @objc deinit
+}
+
+struct NonCopyable : ~Copyable {
+  @_hasStorage var value: Int { get set }
+  init(value: Int = 0)
+}
+
+func runIsolatedAny(_ f: @escaping @isolated(any) () async -> ()) async
+
+@MainActor func callWithMainActorClosure() async
+
+@MainActor func acceptSending(_ ns: sending NonSendable)
+
+func produceSending() -> sending NonSendable
+
+func sendingDemo() async
+
+@concurrent func concurrentWork() async -> Int
+
+@MainActor func callConcurrentFromMainActor() async
+
+func withIsolation<T>(_ isolation: isolated (any Actor)?, _ body: () throws -> T) rethrows -> T
+
+@MainActor func useIsolationMacro()
+
+actor DataStore {
+  @_hasStorage @_hasInitialValue var data: NonSendable? { get set }
+  func store(_ ns: NonSendable)
+  func load() -> NonSendable?
+  @objc deinit
+  init()
+  @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+  @_semantics("defaultActor") nonisolated final var unownedExecutor: UnownedSerialExecutor {
+    get
+  }
+}
+
+func consumeSending(_ x: consuming sending NonCopyable)
+
+class UnsafeShared {
+  @_hasStorage @_hasInitialValue nonisolated(unsafe) static var shared: NonSendable { get set }
+  @objc deinit
+  init()
+}
+
+// one-time initialization token for shared
+sil_global private @$s17AdvancedIsolation12UnsafeSharedC6shared_Wz : $Builtin.Word
+
+// static UnsafeShared.shared
+sil_global hidden @$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvpZ : $NonSendable
+
+// main
+// Isolation: unspecified
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %2 = integer_literal $Builtin.Int32, 0          // user: %3
+  %3 = struct $Int32 (%2)                         // user: %4
+  return %3                                       // id: %4
+} // end sil function 'main'
+
+// variable initialization expression of NonSendable.value
+// Isolation: unspecified
+sil hidden [transparent] @$s17AdvancedIsolation11NonSendableC5valueSivpfi : $@convention(thin) () -> Int {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0          // user: %1
+  %1 = struct $Int (%0)                           // user: %2
+  return %1                                       // id: %2
+} // end sil function '$s17AdvancedIsolation11NonSendableC5valueSivpfi'
+
+// Int.init(_builtinIntegerLiteral:)
+// Isolation: unspecified
+sil public_external [transparent] @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int {
+// %0                                             // user: %2
+bb0(%0 : $Builtin.IntLiteral, %1 : $@thin Int.Type):
+  %2 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0) : $(Builtin.Int64, Builtin.Int1) // user: %3
+  %3 = tuple_extract %2, 0                        // user: %4
+  %4 = struct $Int (%3)                           // user: %5
+  return %4                                       // id: %5
+} // end sil function '$sSi22_builtinIntegerLiteralSiBI_tcfC'
+
+// NonSendable.value.getter
+// Isolation: unspecified
+sil hidden [transparent] @$s17AdvancedIsolation11NonSendableC5valueSivg : $@convention(method) (@guaranteed NonSendable) -> Int {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $NonSendable):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = ref_element_addr %0, #NonSendable.value    // user: %3
+  %3 = begin_access [read] [dynamic] %2           // users: %4, %5
+  %4 = load %3                                    // user: %6
+  end_access %3                                   // id: %5
+  return %4                                       // id: %6
+} // end sil function '$s17AdvancedIsolation11NonSendableC5valueSivg'
+
+// NonSendable.value.setter
+// Isolation: unspecified
+sil hidden [transparent] @$s17AdvancedIsolation11NonSendableC5valueSivs : $@convention(method) (Int, @guaranteed NonSendable) -> () {
+// %0 "value"                                     // users: %6, %2
+// %1 "self"                                      // users: %4, %3
+bb0(%0 : $Int, %1 : $NonSendable):
+  debug_value %0, let, name "value", argno 1      // id: %2
+  debug_value %1, let, name "self", argno 2       // id: %3
+  %4 = ref_element_addr %1, #NonSendable.value    // user: %5
+  %5 = begin_access [modify] [dynamic] %4         // users: %6, %7
+  store %0 to %5                                  // id: %6
+  end_access %5                                   // id: %7
+  %8 = tuple ()                                   // user: %9
+  return %8                                       // id: %9
+} // end sil function '$s17AdvancedIsolation11NonSendableC5valueSivs'
+
+// NonSendable.value.modify
+// Isolation: unspecified
+sil hidden [transparent] @$s17AdvancedIsolation11NonSendableC5valueSivM : $@yield_once @convention(method) (@guaranteed NonSendable) -> @yields @inout Int {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $NonSendable):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = ref_element_addr %0, #NonSendable.value    // user: %3
+  %3 = begin_access [modify] [dynamic] %2         // users: %5, %8, %4
+  yield %3, resume bb1, unwind bb2                // id: %4
+
+bb1:                                              // Preds: bb0
+  end_access %3                                   // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6                                       // id: %7
+
+bb2:                                              // Preds: bb0
+  end_access %3                                   // id: %8
+  unwind                                          // id: %9
+} // end sil function '$s17AdvancedIsolation11NonSendableC5valueSivM'
+
+// default argument 0 of NonSendable.init(value:)
+// Isolation: unspecified
+sil hidden @$s17AdvancedIsolation11NonSendableC5valueACSi_tcfcfA_ : $@convention(thin) () -> Int {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0          // user: %1
+  %1 = struct $Int (%0)                           // user: %2
+  return %1                                       // id: %2
+} // end sil function '$s17AdvancedIsolation11NonSendableC5valueACSi_tcfcfA_'
+
+// NonSendable.__allocating_init(value:)
+// Isolation: unspecified
+sil hidden [exact_self_class] @$s17AdvancedIsolation11NonSendableC5valueACSi_tcfC : $@convention(method) (Int, @thick NonSendable.Type) -> @owned NonSendable {
+// %0 "value"                                     // user: %4
+// %1 "$metatype"
+bb0(%0 : $Int, %1 : $@thick NonSendable.Type):
+  %2 = alloc_ref $NonSendable                     // user: %4
+  // function_ref NonSendable.init(value:)
+  %3 = function_ref @$s17AdvancedIsolation11NonSendableC5valueACSi_tcfc : $@convention(method) (Int, @owned NonSendable) -> @owned NonSendable // user: %4
+  %4 = apply %3(%0, %2) : $@convention(method) (Int, @owned NonSendable) -> @owned NonSendable // user: %5
+  return %4                                       // id: %5
+} // end sil function '$s17AdvancedIsolation11NonSendableC5valueACSi_tcfC'
+
+// NonSendable.init(value:)
+// Isolation: unspecified
+sil hidden @$s17AdvancedIsolation11NonSendableC5valueACSi_tcfc : $@convention(method) (Int, @owned NonSendable) -> @owned NonSendable {
+// %0 "value"                                     // users: %11, %2
+// %1 "self"                                      // users: %4, %3
+bb0(%0 : $Int, %1 : $NonSendable):
+  debug_value %0, let, name "value", argno 1      // id: %2
+  debug_value %1, let, name "self", argno 2       // id: %3
+  %4 = end_init_let_ref %1                        // users: %9, %5, %13
+  %5 = ref_element_addr %4, #NonSendable.value    // user: %8
+  %6 = integer_literal $Builtin.Int64, 0          // user: %7
+  %7 = struct $Int (%6)                           // user: %8
+  store %7 to %5                                  // id: %8
+  %9 = ref_element_addr %4, #NonSendable.value    // user: %10
+  %10 = begin_access [modify] [dynamic] %9        // users: %11, %12
+  store %0 to %10                                 // id: %11
+  end_access %10                                  // id: %12
+  return %4                                       // id: %13
+} // end sil function '$s17AdvancedIsolation11NonSendableC5valueACSi_tcfc'
+
+// NonSendable.deinit
+// Isolation: unspecified
+sil hidden @$s17AdvancedIsolation11NonSendableCfd : $@convention(method) (@guaranteed NonSendable) -> @owned Builtin.NativeObject {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $NonSendable):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = unchecked_ref_cast %0 to $Builtin.NativeObject // user: %3
+  return %2                                       // id: %3
+} // end sil function '$s17AdvancedIsolation11NonSendableCfd'
+
+// NonSendable.__deallocating_deinit
+// Isolation: nonisolated
+sil hidden @$s17AdvancedIsolation11NonSendableCfD : $@convention(method) (@owned NonSendable) -> () {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $NonSendable):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  // function_ref NonSendable.deinit
+  %2 = function_ref @$s17AdvancedIsolation11NonSendableCfd : $@convention(method) (@guaranteed NonSendable) -> @owned Builtin.NativeObject // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed NonSendable) -> @owned Builtin.NativeObject // user: %4
+  %4 = unchecked_ref_cast %3 to $NonSendable      // user: %5
+  dealloc_ref %4                                  // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6                                       // id: %7
+} // end sil function '$s17AdvancedIsolation11NonSendableCfD'
+
+// NonCopyable.value.getter
+// Isolation: unspecified
+sil hidden [transparent] @$s17AdvancedIsolation11NonCopyableV5valueSivg : $@convention(method) (@guaranteed NonCopyable) -> Int {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $NonCopyable):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = struct_extract %0, #NonCopyable.value      // user: %3
+  return %2                                       // id: %3
+} // end sil function '$s17AdvancedIsolation11NonCopyableV5valueSivg'
+
+// NonCopyable.value.setter
+// Isolation: unspecified
+sil hidden [transparent] @$s17AdvancedIsolation11NonCopyableV5valueSivs : $@convention(method) (Int, @inout NonCopyable) -> () {
+// %0 "value"                                     // users: %8, %2
+// %1 "self"                                      // users: %6, %4, %3
+bb0(%0 : $Int, %1 : $*NonCopyable):
+  debug_value %0, let, name "value", argno 1      // id: %2
+  debug_value %1, var, name "self", argno 2, expr op_deref // id: %3
+  destroy_addr %1                                 // id: %4
+  debug_value undef : $*NonCopyable, var, name "self", argno 2, expr op_deref // id: %5
+  %6 = begin_access [modify] [static] %1          // users: %9, %7
+  %7 = struct_element_addr %6, #NonCopyable.value // user: %8
+  store %0 to %7                                  // id: %8
+  end_access %6                                   // id: %9
+  %10 = tuple ()                                  // user: %11
+  return %10                                      // id: %11
+} // end sil function '$s17AdvancedIsolation11NonCopyableV5valueSivs'
+
+// NonCopyable.value.modify
+// Isolation: unspecified
+sil hidden [transparent] @$s17AdvancedIsolation11NonCopyableV5valueSivM : $@yield_once @convention(method) (@inout NonCopyable) -> @yields @inout Int {
+// %0 "self"                                      // users: %9, %5, %2, %1
+bb0(%0 : $*NonCopyable):
+  debug_value %0, var, name "self", argno 1, expr op_deref // id: %1
+  %2 = begin_access [modify] [static] %0          // users: %6, %10, %3
+  %3 = struct_element_addr %2, #NonCopyable.value // user: %4
+  yield %3, resume bb1, unwind bb2                // id: %4
+
+bb1:                                              // Preds: bb0
+  debug_value %0, var, name "self", argno 1, expr op_deref // id: %5
+  end_access %2                                   // id: %6
+  %7 = tuple ()                                   // user: %8
+  return %7                                       // id: %8
+
+bb2:                                              // Preds: bb0
+  debug_value %0, var, name "self", argno 1, expr op_deref // id: %9
+  end_access %2                                   // id: %10
+  unwind                                          // id: %11
+} // end sil function '$s17AdvancedIsolation11NonCopyableV5valueSivM'
+
+// default argument 0 of NonCopyable.init(value:)
+// Isolation: unspecified
+sil hidden @$s17AdvancedIsolation11NonCopyableV5valueACSi_tcfcfA_ : $@convention(thin) () -> Int {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0          // user: %1
+  %1 = struct $Int (%0)                           // user: %2
+  return %1                                       // id: %2
+} // end sil function '$s17AdvancedIsolation11NonCopyableV5valueACSi_tcfcfA_'
+
+// NonCopyable.init(value:)
+// Isolation: unspecified
+sil hidden @$s17AdvancedIsolation11NonCopyableV5valueACSi_tcfC : $@convention(method) (Int, @thin NonCopyable.Type) -> @owned NonCopyable {
+// %0 "value"                                     // users: %6, %3
+// %1 "$metatype"
+bb0(%0 : $Int, %1 : $@thin NonCopyable.Type):
+  %2 = alloc_stack [lexical] [var_decl] $NonCopyable, var, name "self", type $NonCopyable // users: %8, %4, %10
+  debug_value %0, let, name "value", argno 1      // id: %3
+  %4 = begin_access [modify] [static] %2          // users: %5, %7
+  %5 = struct_element_addr %4, #NonCopyable.value // user: %6
+  store %0 to %5                                  // id: %6
+  end_access %4                                   // id: %7
+  %8 = load %2                                    // user: %11
+  debug_value undef : $*NonCopyable, var, name "self" // id: %9
+  dealloc_stack %2                                // id: %10
+  return %8                                       // id: %11
+} // end sil function '$s17AdvancedIsolation11NonCopyableV5valueACSi_tcfC'
+
+// runIsolatedAny(_:)
+// Isolation: unspecified
+sil hidden @$s17AdvancedIsolation14runIsolatedAnyyyyyYaYAcYaF : $@convention(thin) @async (@guaranteed @isolated(any) @async @callee_guaranteed () -> ()) -> () {
+// %0 "f"                                         // users: %12, %10, %9, %8, %5, %4, %1
+bb0(%0 : $@isolated(any) @async @callee_guaranteed () -> ()):
+  debug_value %0, let, name "f", argno 1          // id: %1
+  %2 = enum $Optional<Builtin.Executor>, #Optional.none!enumelt // users: %11, %3
+  hop_to_executor %2                              // id: %3
+  strong_retain %0                                // id: %4
+  %5 = function_extract_isolation %0              // users: %13, %7, %6
+  retain_value %5                                 // id: %6
+  debug_value %5, let, name "iso"                 // id: %7
+  strong_release %0                               // id: %8
+  strong_retain %0                                // id: %9
+  %10 = apply %0() : $@isolated(any) @async @callee_guaranteed () -> ()
+  hop_to_executor %2                              // id: %11
+  strong_release %0                               // id: %12
+  release_value %5                                // id: %13
+  %14 = tuple ()                                  // user: %15
+  return %14                                      // id: %15
+} // end sil function '$s17AdvancedIsolation14runIsolatedAnyyyyyYaYAcYaF'
+
+// callWithMainActorClosure()
+// Isolation: global_actor. type: MainActor
+sil hidden @$s17AdvancedIsolation24callWithMainActorClosureyyYaF : $@convention(thin) @async () -> () {
+bb0:
+  %0 = metatype $@thick MainActor.Type            // user: %2
+  // function_ref static MainActor.shared.getter
+  %1 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // users: %15, %3, %14
+  hop_to_executor %2                              // id: %3
+  // function_ref closure #1 in callWithMainActorClosure()
+  %4 = function_ref @$s17AdvancedIsolation24callWithMainActorClosureyyYaFyyYaScMYccfU_ : $@convention(thin) @async (@guaranteed Optional<any Actor>) -> () // user: %10
+  %5 = metatype $@thick MainActor.Type            // user: %7
+  // function_ref static MainActor.shared.getter
+  %6 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %7
+  %7 = apply %6(%5) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %8
+  %8 = init_existential_ref %7 : $MainActor : $MainActor, $any Actor // user: %9
+  %9 = enum $Optional<any Actor>, #Optional.some!enumelt, %8 // user: %10
+  %10 = partial_apply [callee_guaranteed] [isolated_any] %4(%9) : $@convention(thin) @async (@guaranteed Optional<any Actor>) -> () // users: %13, %12
+  // function_ref runIsolatedAny(_:)
+  %11 = function_ref @$s17AdvancedIsolation14runIsolatedAnyyyyyYaYAcYaF : $@convention(thin) @async (@guaranteed @isolated(any) @async @callee_guaranteed () -> ()) -> () // user: %12
+  %12 = apply %11(%10) : $@convention(thin) @async (@guaranteed @isolated(any) @async @callee_guaranteed () -> ()) -> ()
+  strong_release %10                              // id: %13
+  hop_to_executor %2                              // id: %14
+  strong_release %2                               // id: %15
+  %16 = tuple ()                                  // user: %17
+  return %16                                      // id: %17
+} // end sil function '$s17AdvancedIsolation24callWithMainActorClosureyyYaF'
+
+// static MainActor.shared.getter
+// Isolation: unspecified
+sil [available 12.0.0] @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+
+// closure #1 in callWithMainActorClosure()
+// Isolation: global_actor. type: MainActor
+sil private @$s17AdvancedIsolation24callWithMainActorClosureyyYaFyyYaScMYccfU_ : $@convention(thin) @async (@guaranteed Optional<any Actor>) -> () {
+bb0(%0 : $Optional<any Actor>):
+  %1 = metatype $@thick MainActor.Type            // user: %3
+  // function_ref static MainActor.shared.getter
+  %2 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // users: %31, %4
+  hop_to_executor %3                              // id: %4
+  %5 = integer_literal $Builtin.Word, 1           // user: %7
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %6 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %7
+  %7 = apply %6<Any>(%5) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %9, %8
+  %8 = tuple_extract %7, 0                        // users: %10, %21
+  %9 = tuple_extract %7, 1                        // user: %10
+  %10 = mark_dependence %9 on %8                  // user: %11
+  %11 = pointer_to_address %10 to [strict] $*Any  // user: %18
+  %12 = string_literal utf8 "on MainActor"        // user: %17
+  %13 = integer_literal $Builtin.Word, 12         // user: %17
+  %14 = integer_literal $Builtin.Int1, -1         // user: %17
+  %15 = metatype $@thin String.Type               // user: %17
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %16 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %17
+  %17 = apply %16(%12, %13, %14, %15) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %19
+  %18 = init_existential_addr %11, $String        // user: %19
+  store %17 to %18                                // id: %19
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %20 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %21
+  %21 = apply %20<Any>(%8) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %30, %27
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %22 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %23
+  %23 = apply %22() : $@convention(thin) () -> @owned String // users: %29, %27
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %24 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %25
+  %25 = apply %24() : $@convention(thin) () -> @owned String // users: %28, %27
+  // function_ref print(_:separator:terminator:)
+  %26 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %27
+  %27 = apply %26(%21, %23, %25) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %25                               // id: %28
+  release_value %23                               // id: %29
+  release_value %21                               // id: %30
+  strong_release %3                               // id: %31
+  %32 = tuple ()                                  // user: %33
+  return %32                                      // id: %33
+} // end sil function '$s17AdvancedIsolation24callWithMainActorClosureyyYaFyyYaScMYccfU_'
+
+// _allocateUninitializedArray<A>(_:)
+// Isolation: unspecified
+sil [always_inline] [_semantics "array.uninitialized_intrinsic"] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <Element> (Builtin.Word) -> (@owned Array<Element>, Builtin.RawPointer)
+
+// String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+// Isolation: unspecified
+sil [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+
+// _finalizeUninitializedArray<A>(_:)
+// Isolation: unspecified
+sil shared [readnone] [_semantics "array.finalize_intrinsic"] @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <Element> (@owned Array<Element>) -> @owned Array<Element> {
+[%0: escape! v** => %r.v**, escape! v**.c*.v** => %r.v**.c*.v**]
+// %0                                             // user: %2
+bb0(%0 : $Array<Element>):
+  %1 = alloc_stack [var_decl] $Array<Element>     // users: %5, %2, %6, %4
+  store %0 to %1                                  // id: %2
+  // function_ref Array._endMutation()
+  %3 = function_ref @$sSa12_endMutationyyF : $@convention(method) <τ_0_0> (@inout Array<τ_0_0>) -> () // user: %4
+  %4 = apply %3<Element>(%1) : $@convention(method) <τ_0_0> (@inout Array<τ_0_0>) -> ()
+  %5 = load %1                                    // user: %7
+  dealloc_stack %1                                // id: %6
+  return %5                                       // id: %7
+} // end sil function '$ss27_finalizeUninitializedArrayySayxGABnlF'
+
+// default argument 1 of print(_:separator:terminator:)
+// Isolation: unspecified
+sil shared @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String {
+bb0:
+  %0 = string_literal utf8 " "                    // user: %5
+  %1 = integer_literal $Builtin.Word, 1           // user: %5
+  %2 = integer_literal $Builtin.Int1, -1          // user: %5
+  %3 = metatype $@thin String.Type                // user: %5
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %5
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %6
+  return %5                                       // id: %6
+} // end sil function '$ss5print_9separator10terminatoryypd_S2StFfA0_'
+
+// default argument 2 of print(_:separator:terminator:)
+// Isolation: unspecified
+sil shared @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String {
+bb0:
+  %0 = string_literal utf8 "\n"                   // user: %5
+  %1 = integer_literal $Builtin.Word, 1           // user: %5
+  %2 = integer_literal $Builtin.Int1, -1          // user: %5
+  %3 = metatype $@thin String.Type                // user: %5
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %5
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %6
+  return %5                                       // id: %6
+} // end sil function '$ss5print_9separator10terminatoryypd_S2StFfA1_'
+
+// print(_:separator:terminator:)
+// Isolation: unspecified
+sil @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+
+// acceptSending(_:)
+// Isolation: global_actor. type: MainActor
+sil hidden @$s17AdvancedIsolation13acceptSendingyyAA11NonSendableCnF : $@convention(thin) (@sil_sending @owned NonSendable) -> () {
+// %0 "ns"                                        // users: %17, %3, %13, %14, %2
+bb0(%0 : $NonSendable):
+  %1 = alloc_stack [lexical] [var_decl] $NonSendable, var, name "ns", type $NonSendable // users: %3, %30, %29, %11
+  strong_retain %0                                // id: %2
+  store %0 to %1                                  // id: %3
+  %4 = integer_literal $Builtin.Word, 1           // user: %6
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %5 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %6
+  %6 = apply %5<Any>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %8, %7
+  %7 = tuple_extract %6, 0                        // users: %9, %19
+  %8 = tuple_extract %6, 1                        // user: %9
+  %9 = mark_dependence %8 on %7                   // user: %10
+  %10 = pointer_to_address %9 to [strict] $*Any   // user: %15
+  %11 = begin_access [read] [static] %1           // user: %12
+  end_access %11                                  // id: %12
+  %13 = class_method %0, #NonSendable.value!getter : (NonSendable) -> () -> Int, $@convention(method) (@guaranteed NonSendable) -> Int // user: %14
+  %14 = apply %13(%0) : $@convention(method) (@guaranteed NonSendable) -> Int // user: %16
+  %15 = init_existential_addr %10, $Int           // user: %16
+  store %14 to %15                                // id: %16
+  strong_release %0                               // id: %17
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %18 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %19
+  %19 = apply %18<Any>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %28, %25
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %20 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %21
+  %21 = apply %20() : $@convention(thin) () -> @owned String // users: %27, %25
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %22 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %23
+  %23 = apply %22() : $@convention(thin) () -> @owned String // users: %26, %25
+  // function_ref print(_:separator:terminator:)
+  %24 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %25
+  %25 = apply %24(%19, %21, %23) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %23                               // id: %26
+  release_value %21                               // id: %27
+  release_value %19                               // id: %28
+  destroy_addr %1                                 // id: %29
+  dealloc_stack %1                                // id: %30
+  %31 = tuple ()                                  // user: %32
+  return %31                                      // id: %32
+} // end sil function '$s17AdvancedIsolation13acceptSendingyyAA11NonSendableCnF'
+
+// produceSending()
+// Isolation: unspecified
+sil hidden @$s17AdvancedIsolation14produceSendingAA11NonSendableCyF : $@convention(thin) () -> @sil_sending @owned NonSendable {
+bb0:
+  %0 = metatype $@thick NonSendable.Type          // user: %4
+  %1 = integer_literal $Builtin.Int64, 42         // user: %2
+  %2 = struct $Int (%1)                           // user: %4
+  // function_ref NonSendable.__allocating_init(value:)
+  %3 = function_ref @$s17AdvancedIsolation11NonSendableC5valueACSi_tcfC : $@convention(method) (Int, @thick NonSendable.Type) -> @owned NonSendable // user: %4
+  %4 = apply %3(%2, %0) : $@convention(method) (Int, @thick NonSendable.Type) -> @owned NonSendable // user: %5
+  return %4                                       // id: %5
+} // end sil function '$s17AdvancedIsolation14produceSendingAA11NonSendableCyF'
+
+// sendingDemo()
+// Isolation: unspecified
+sil hidden @$s17AdvancedIsolation11sendingDemoyyYaF : $@convention(thin) @async () -> () {
+bb0:
+  %0 = enum $Optional<Builtin.Executor>, #Optional.none!enumelt // users: %16, %1
+  hop_to_executor %0                              // id: %1
+  %2 = metatype $@thick NonSendable.Type          // user: %6
+  %3 = integer_literal $Builtin.Int64, 10         // user: %4
+  %4 = struct $Int (%3)                           // user: %6
+  // function_ref NonSendable.__allocating_init(value:)
+  %5 = function_ref @$s17AdvancedIsolation11NonSendableC5valueACSi_tcfC : $@convention(method) (Int, @thick NonSendable.Type) -> @owned NonSendable // user: %6
+  %6 = apply %5(%4, %2) : $@convention(method) (Int, @thick NonSendable.Type) -> @owned NonSendable // users: %17, %14, %8, %7
+  debug_value %6, let, name "ns"                  // id: %7
+  strong_retain %6                                // id: %8
+  // function_ref acceptSending(_:)
+  %9 = function_ref @$s17AdvancedIsolation13acceptSendingyyAA11NonSendableCnF : $@convention(thin) (@sil_sending @owned NonSendable) -> () // user: %14
+  %10 = metatype $@thick MainActor.Type           // user: %12
+  // function_ref static MainActor.shared.getter
+  %11 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %12
+  %12 = apply %11(%10) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // users: %15, %13
+  hop_to_executor %12                             // id: %13
+  %14 = apply %9(%6) : $@convention(thin) (@sil_sending @owned NonSendable) -> ()
+  strong_release %12                              // id: %15
+  hop_to_executor %0                              // id: %16
+  strong_release %6                               // id: %17
+  %18 = tuple ()                                  // user: %19
+  return %18                                      // id: %19
+} // end sil function '$s17AdvancedIsolation11sendingDemoyyYaF'
+
+// concurrentWork()
+// Isolation: nonisolated
+sil hidden @$s17AdvancedIsolation14concurrentWorkSiyYaF : $@convention(thin) @async () -> Int {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 42         // user: %1
+  %1 = struct $Int (%0)                           // user: %2
+  return %1                                       // id: %2
+} // end sil function '$s17AdvancedIsolation14concurrentWorkSiyYaF'
+
+// callConcurrentFromMainActor()
+// Isolation: global_actor. type: MainActor
+sil hidden @$s17AdvancedIsolation27callConcurrentFromMainActoryyYaF : $@convention(thin) @async () -> () {
+bb0:
+  %0 = metatype $@thick MainActor.Type            // user: %2
+  // function_ref static MainActor.shared.getter
+  %1 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // users: %27, %5
+  // function_ref concurrentWork()
+  %3 = function_ref @$s17AdvancedIsolation14concurrentWorkSiyYaF : $@convention(thin) @async () -> Int // user: %4
+  %4 = apply %3() : $@convention(thin) @async () -> Int // users: %15, %6
+  hop_to_executor %2                              // id: %5
+  debug_value %4, let, name "result"              // id: %6
+  %7 = integer_literal $Builtin.Word, 1           // user: %9
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %8 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %9
+  %9 = apply %8<Any>(%7) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %11, %10
+  %10 = tuple_extract %9, 0                       // users: %12, %17
+  %11 = tuple_extract %9, 1                       // user: %12
+  %12 = mark_dependence %11 on %10                // user: %13
+  %13 = pointer_to_address %12 to [strict] $*Any  // user: %14
+  %14 = init_existential_addr %13, $Int           // user: %15
+  store %4 to %14                                 // id: %15
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %16 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %17
+  %17 = apply %16<Any>(%10) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %26, %23
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %18 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %19
+  %19 = apply %18() : $@convention(thin) () -> @owned String // users: %25, %23
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %20 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %21
+  %21 = apply %20() : $@convention(thin) () -> @owned String // users: %24, %23
+  // function_ref print(_:separator:terminator:)
+  %22 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %23
+  %23 = apply %22(%17, %19, %21) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %21                               // id: %24
+  release_value %19                               // id: %25
+  release_value %17                               // id: %26
+  strong_release %2                               // id: %27
+  %28 = tuple ()                                  // user: %29
+  return %28                                      // id: %29
+} // end sil function '$s17AdvancedIsolation27callConcurrentFromMainActoryyYaF'
+
+// withIsolation<A>(_:_:)
+// Isolation: actor_instance. name: 'isolation'
+sil hidden @$s17AdvancedIsolation04withB0yxScA_pSgYi_xyKXEtKlF : $@convention(thin) <T> (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>) -> (@out T, @error any Error) {
+// %0 "$return_value"                             // user: %6
+// %1 "isolation"                                 // user: %3
+// %2 "body"                                      // users: %6, %4
+bb0(%0 : $*T, %1 : $Optional<any Actor>, %2 : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>):
+  debug_value %1, let, name "isolation", argno 1  // id: %3
+  debug_value %2, let, name "body", argno 2       // id: %4
+  debug_value undef : $any Error, var, name "$error", argno 3 // id: %5
+  try_apply %2(%0) : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>, normal bb1, error bb2 // id: %6
+
+bb1(%7 : $()):                                    // Preds: bb0
+  %8 = tuple ()                                   // user: %9
+  return %8                                       // id: %9
+
+// %10                                            // user: %11
+bb2(%10 : $any Error):                            // Preds: bb0
+  throw %10                                       // id: %11
+} // end sil function '$s17AdvancedIsolation04withB0yxScA_pSgYi_xyKXEtKlF'
+
+// useIsolationMacro()
+// Isolation: global_actor. type: MainActor
+sil hidden @$s17AdvancedIsolation03useB5MacroyyF : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $()                            // users: %12, %9
+  %1 = metatype $@thick MainActor.Type            // user: %3
+  // function_ref static MainActor.shared.getter
+  %2 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %4
+  %4 = init_existential_ref %3 : $MainActor : $MainActor, $any Actor // user: %5
+  %5 = enum $Optional<any Actor>, #Optional.some!enumelt, %4 // users: %11, %9
+  // function_ref closure #1 in useIsolationMacro()
+  %6 = function_ref @$s17AdvancedIsolation03useB5MacroyyFyyXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %7
+  %7 = thin_to_thick_function %6 to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %9
+  // function_ref withIsolation<A>(_:_:)
+  %8 = function_ref @$s17AdvancedIsolation04withB0yxScA_pSgYi_xyKXEtKlF : $@convention(thin) <τ_0_0> (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>) -> (@out τ_0_0, @error any Error) // user: %9
+  try_apply %8<()>(%0, %5, %7) : $@convention(thin) <τ_0_0> (@sil_isolated @guaranteed Optional<any Actor>, @guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>) -> (@out τ_0_0, @error any Error), normal bb1, error bb2 // id: %9
+
+bb1(%10 : $()):                                   // Preds: bb0
+  release_value %5                                // id: %11
+  dealloc_stack %0                                // id: %12
+  %13 = tuple ()                                  // user: %14
+  return %13                                      // id: %14
+
+bb2(%15 : $any Error):                            // Preds: bb0
+  unreachable                                     // id: %16
+} // end sil function '$s17AdvancedIsolation03useB5MacroyyF'
+
+// freestanding macro expansion #1 of isolation in module AdvancedIsolation file AdvancedIsolation.swift line 82 column 19
+sil @$s17AdvancedIsolation0028AdvancedIsolationswift_IxAFhfMX81_18_9isolationfMf_ : $@convention(thin) () -> ()
+
+// closure #1 in useIsolationMacro()
+// Isolation: global_actor. type: MainActor
+sil private @$s17AdvancedIsolation03useB5MacroyyFyyXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> {
+// %0 "$return_value"
+bb0(%0 : $*()):
+  debug_value undef : $any Error, var, name "$error", argno 1 // id: %1
+  %2 = integer_literal $Builtin.Word, 1           // user: %4
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %3 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %4
+  %4 = apply %3<Any>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %6, %5
+  %5 = tuple_extract %4, 0                        // users: %7, %18
+  %6 = tuple_extract %4, 1                        // user: %7
+  %7 = mark_dependence %6 on %5                   // user: %8
+  %8 = pointer_to_address %7 to [strict] $*Any    // user: %15
+  %9 = string_literal utf8 "inherited isolation"  // user: %14
+  %10 = integer_literal $Builtin.Word, 19         // user: %14
+  %11 = integer_literal $Builtin.Int1, -1         // user: %14
+  %12 = metatype $@thin String.Type               // user: %14
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %13 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %16
+  %15 = init_existential_addr %8, $String         // user: %16
+  store %14 to %15                                // id: %16
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %17 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %18
+  %18 = apply %17<Any>(%5) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %27, %24
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %19 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %20
+  %20 = apply %19() : $@convention(thin) () -> @owned String // users: %26, %24
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %21 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %22
+  %22 = apply %21() : $@convention(thin) () -> @owned String // users: %25, %24
+  // function_ref print(_:separator:terminator:)
+  %23 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %24
+  %24 = apply %23(%18, %20, %22) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %22                               // id: %25
+  release_value %20                               // id: %26
+  release_value %18                               // id: %27
+  %28 = tuple ()                                  // user: %29
+  return %28                                      // id: %29
+} // end sil function '$s17AdvancedIsolation03useB5MacroyyFyyXEfU_'
+
+// variable initialization expression of DataStore.data
+// Isolation: unspecified
+sil hidden [transparent] @$s17AdvancedIsolation9DataStoreC4dataAA11NonSendableCSgvpfi : $@convention(thin) () -> @owned Optional<NonSendable> {
+bb0:
+  %0 = enum $Optional<NonSendable>, #Optional.none!enumelt // user: %1
+  return %0                                       // id: %1
+} // end sil function '$s17AdvancedIsolation9DataStoreC4dataAA11NonSendableCSgvpfi'
+
+// DataStore.data.getter
+// Isolation: actor_instance. name: 'self'
+sil hidden [transparent] @$s17AdvancedIsolation9DataStoreC4dataAA11NonSendableCSgvg : $@convention(method) (@sil_isolated @guaranteed DataStore) -> @owned Optional<NonSendable> {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $DataStore):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = ref_element_addr %0, #DataStore.data       // user: %3
+  %3 = begin_access [read] [dynamic] %2           // users: %4, %6
+  %4 = load %3                                    // users: %7, %5
+  retain_value %4                                 // id: %5
+  end_access %3                                   // id: %6
+  return %4                                       // id: %7
+} // end sil function '$s17AdvancedIsolation9DataStoreC4dataAA11NonSendableCSgvg'
+
+// DataStore.data.setter
+// Isolation: actor_instance. name: 'self'
+sil hidden [transparent] @$s17AdvancedIsolation9DataStoreC4dataAA11NonSendableCSgvs : $@convention(method) (@owned Optional<NonSendable>, @sil_isolated @guaranteed DataStore) -> () {
+// %0 "value"                                     // users: %11, %8, %4, %2
+// %1 "self"                                      // users: %5, %3
+bb0(%0 : $Optional<NonSendable>, %1 : $DataStore):
+  debug_value %0, let, name "value", argno 1      // id: %2
+  debug_value %1, let, name "self", argno 2       // id: %3
+  retain_value %0                                 // id: %4
+  %5 = ref_element_addr %1, #DataStore.data       // user: %6
+  %6 = begin_access [modify] [dynamic] %5         // users: %8, %7, %10
+  %7 = load %6                                    // user: %9
+  store %0 to %6                                  // id: %8
+  release_value %7                                // id: %9
+  end_access %6                                   // id: %10
+  release_value %0                                // id: %11
+  %12 = tuple ()                                  // user: %13
+  return %12                                      // id: %13
+} // end sil function '$s17AdvancedIsolation9DataStoreC4dataAA11NonSendableCSgvs'
+
+// DataStore.data.modify
+// Isolation: actor_instance. name: 'self'
+sil hidden [transparent] @$s17AdvancedIsolation9DataStoreC4dataAA11NonSendableCSgvM : $@yield_once @convention(method) (@sil_isolated @guaranteed DataStore) -> @yields @inout Optional<NonSendable> {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $DataStore):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = ref_element_addr %0, #DataStore.data       // user: %3
+  %3 = begin_access [modify] [dynamic] %2         // users: %5, %8, %4
+  yield %3, resume bb1, unwind bb2                // id: %4
+
+bb1:                                              // Preds: bb0
+  end_access %3                                   // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6                                       // id: %7
+
+bb2:                                              // Preds: bb0
+  end_access %3                                   // id: %8
+  unwind                                          // id: %9
+} // end sil function '$s17AdvancedIsolation9DataStoreC4dataAA11NonSendableCSgvM'
+
+// DataStore.store(_:)
+// Isolation: actor_instance. name: 'self'
+sil hidden @$s17AdvancedIsolation9DataStoreC5storeyyAA11NonSendableCF : $@convention(method) (@guaranteed NonSendable, @sil_isolated @guaranteed DataStore) -> () {
+// %0 "ns"                                        // users: %5, %4, %2
+// %1 "self"                                      // users: %7, %6, %3
+bb0(%0 : $NonSendable, %1 : $DataStore):
+  debug_value %0, let, name "ns", argno 1         // id: %2
+  debug_value %1, let, name "self", argno 2       // id: %3
+  strong_retain %0                                // id: %4
+  %5 = enum $Optional<NonSendable>, #Optional.some!enumelt, %0 // user: %7
+  %6 = class_method %1, #DataStore.data!setter : (isolated DataStore) -> (NonSendable?) -> (), $@convention(method) (@owned Optional<NonSendable>, @sil_isolated @guaranteed DataStore) -> () // user: %7
+  %7 = apply %6(%5, %1) : $@convention(method) (@owned Optional<NonSendable>, @sil_isolated @guaranteed DataStore) -> ()
+  %8 = tuple ()                                   // user: %9
+  return %8                                       // id: %9
+} // end sil function '$s17AdvancedIsolation9DataStoreC5storeyyAA11NonSendableCF'
+
+// DataStore.load()
+// Isolation: actor_instance. name: 'self'
+sil hidden @$s17AdvancedIsolation9DataStoreC4loadAA11NonSendableCSgyF : $@convention(method) (@sil_isolated @guaranteed DataStore) -> @owned Optional<NonSendable> {
+// %0 "self"                                      // users: %3, %2, %1
+bb0(%0 : $DataStore):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = class_method %0, #DataStore.data!getter : (isolated DataStore) -> () -> NonSendable?, $@convention(method) (@sil_isolated @guaranteed DataStore) -> @owned Optional<NonSendable> // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@sil_isolated @guaranteed DataStore) -> @owned Optional<NonSendable> // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s17AdvancedIsolation9DataStoreC4loadAA11NonSendableCSgyF'
+
+// DataStore.deinit
+// Isolation: unspecified
+sil hidden @$s17AdvancedIsolation9DataStoreCfd : $@convention(method) (@guaranteed DataStore) -> @owned Builtin.NativeObject {
+// %0 "self"                                      // users: %7, %6, %2, %1
+bb0(%0 : $DataStore):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = ref_element_addr %0, #DataStore.data       // user: %3
+  %3 = begin_access [deinit] [static] %2          // users: %5, %4
+  destroy_addr %3                                 // id: %4
+  end_access %3                                   // id: %5
+  %6 = builtin "destroyDefaultActor"(%0) : $()
+  %7 = unchecked_ref_cast %0 to $Builtin.NativeObject // user: %8
+  return %7                                       // id: %8
+} // end sil function '$s17AdvancedIsolation9DataStoreCfd'
+
+// DataStore.__deallocating_deinit
+// Isolation: nonisolated
+sil hidden @$s17AdvancedIsolation9DataStoreCfD : $@convention(method) (@owned DataStore) -> () {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $DataStore):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  // function_ref DataStore.deinit
+  %2 = function_ref @$s17AdvancedIsolation9DataStoreCfd : $@convention(method) (@guaranteed DataStore) -> @owned Builtin.NativeObject // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed DataStore) -> @owned Builtin.NativeObject // user: %4
+  %4 = unchecked_ref_cast %3 to $DataStore        // user: %5
+  dealloc_ref %4                                  // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6                                       // id: %7
+} // end sil function '$s17AdvancedIsolation9DataStoreCfD'
+
+// DataStore.__allocating_init()
+// Isolation: nonisolated
+sil hidden [exact_self_class] @$s17AdvancedIsolation9DataStoreCACycfC : $@convention(method) (@thick DataStore.Type) -> @owned DataStore {
+// %0 "$metatype"
+bb0(%0 : $@thick DataStore.Type):
+  %1 = alloc_ref $DataStore                       // user: %3
+  // function_ref DataStore.init()
+  %2 = function_ref @$s17AdvancedIsolation9DataStoreCACycfc : $@convention(method) (@owned DataStore) -> @owned DataStore // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@owned DataStore) -> @owned DataStore // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s17AdvancedIsolation9DataStoreCACycfC'
+
+// DataStore.init()
+// Isolation: nonisolated
+sil hidden @$s17AdvancedIsolation9DataStoreCACycfc : $@convention(method) (@owned DataStore) -> @owned DataStore {
+// %0 "self"                                      // users: %3, %2, %1
+bb0(%0 : $DataStore):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = builtin "initializeDefaultActor"(%0) : $()
+  %3 = end_init_let_ref %0                        // users: %4, %7
+  %4 = ref_element_addr %3, #DataStore.data       // user: %6
+  %5 = enum $Optional<NonSendable>, #Optional.none!enumelt // user: %6
+  store %5 to %4                                  // id: %6
+  return %3                                       // id: %7
+} // end sil function '$s17AdvancedIsolation9DataStoreCACycfc'
+
+// DataStore.unownedExecutor.getter
+// Isolation: nonisolated
+sil hidden [available 10.15] [_semantics "defaultActor"] @$s17AdvancedIsolation9DataStoreC15unownedExecutorScevg : $@convention(method) (@guaranteed DataStore) -> UnownedSerialExecutor {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $DataStore):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = metatype $@thin UnownedSerialExecutor.Type // user: %5
+  %3 = builtin "buildDefaultActorExecutorRef"<DataStore>(%0) : $Builtin.Executor // user: %5
+  // function_ref UnownedSerialExecutor.init(_:)
+  %4 = function_ref @$sSceySceBecfC : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor // user: %5
+  %5 = apply %4(%3, %2) : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor // user: %6
+  return %5                                       // id: %6
+} // end sil function '$s17AdvancedIsolation9DataStoreC15unownedExecutorScevg'
+
+// UnownedSerialExecutor.init(_:)
+// Isolation: unspecified
+sil [available 12.0.0] @$sSceySceBecfC : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor
+
+// protocol witness for Actor.unownedExecutor.getter in conformance DataStore
+// Isolation: nonisolated
+sil private [transparent] [thunk] @$s17AdvancedIsolation9DataStoreCScAAAScA15unownedExecutorScevgTW : $@convention(witness_method: Actor) (@guaranteed DataStore) -> UnownedSerialExecutor {
+// %0                                             // user: %2
+bb0(%0 : $DataStore):
+  // function_ref DataStore.unownedExecutor.getter
+  %1 = function_ref @$s17AdvancedIsolation9DataStoreC15unownedExecutorScevg : $@convention(method) (@guaranteed DataStore) -> UnownedSerialExecutor // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed DataStore) -> UnownedSerialExecutor // user: %3
+  return %2                                       // id: %3
+} // end sil function '$s17AdvancedIsolation9DataStoreCScAAAScA15unownedExecutorScevgTW'
+
+// consumeSending(_:)
+// Isolation: unspecified
+sil hidden @$s17AdvancedIsolation14consumeSendingyyAA11NonCopyableVnF : $@convention(thin) (@sil_sending @owned NonCopyable) -> () {
+// %0 "x"                                         // users: %3, %2
+bb0(%0 : $NonCopyable):
+  %1 = alloc_stack [lexical] [var_decl] $NonCopyable, var, name "x", type $NonCopyable // users: %3, %11, %27, %28
+  %2 = struct_extract %0, #NonCopyable.value      // user: %14
+  store %0 to %1                                  // id: %3
+  %4 = integer_literal $Builtin.Word, 1           // user: %6
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %5 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %6
+  %6 = apply %5<Any>(%4) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %8, %7
+  %7 = tuple_extract %6, 0                        // users: %9, %16
+  %8 = tuple_extract %6, 1                        // user: %9
+  %9 = mark_dependence %8 on %7                   // user: %10
+  %10 = pointer_to_address %9 to [strict] $*Any   // user: %13
+  %11 = begin_access [read] [static] %1           // user: %12
+  end_access %11                                  // id: %12
+  %13 = init_existential_addr %10, $Int           // user: %14
+  store %2 to %13                                 // id: %14
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %15 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %16
+  %16 = apply %15<Any>(%7) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %25, %22
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %17 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %18
+  %18 = apply %17() : $@convention(thin) () -> @owned String // users: %24, %22
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %19 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %20
+  %20 = apply %19() : $@convention(thin) () -> @owned String // users: %23, %22
+  // function_ref print(_:separator:terminator:)
+  %21 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %22
+  %22 = apply %21(%16, %18, %20) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %20                               // id: %23
+  release_value %18                               // id: %24
+  release_value %16                               // id: %25
+  debug_value undef : $*NonCopyable, var, name "x" // id: %26
+  destroy_addr %1                                 // id: %27
+  dealloc_stack %1                                // id: %28
+  %29 = tuple ()                                  // user: %30
+  return %29                                      // id: %30
+} // end sil function '$s17AdvancedIsolation14consumeSendingyyAA11NonCopyableVnF'
+
+// one-time initialization function for shared
+sil private [global_init_once_fn] @$s17AdvancedIsolation12UnsafeSharedC6shared_WZ : $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvpZ // id: %1
+  %2 = global_addr @$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvpZ : $*NonSendable // user: %8
+  %3 = metatype $@thick NonSendable.Type          // user: %7
+  // function_ref default argument 0 of NonSendable.init(value:)
+  %4 = function_ref @$s17AdvancedIsolation11NonSendableC5valueACSi_tcfcfA_ : $@convention(thin) () -> Int // user: %5
+  %5 = apply %4() : $@convention(thin) () -> Int  // user: %7
+  // function_ref NonSendable.__allocating_init(value:)
+  %6 = function_ref @$s17AdvancedIsolation11NonSendableC5valueACSi_tcfC : $@convention(method) (Int, @thick NonSendable.Type) -> @owned NonSendable // user: %7
+  %7 = apply %6(%5, %3) : $@convention(method) (Int, @thick NonSendable.Type) -> @owned NonSendable // user: %8
+  store %7 to %2                                  // id: %8
+  %9 = tuple ()                                   // user: %10
+  return %9                                       // id: %10
+} // end sil function '$s17AdvancedIsolation12UnsafeSharedC6shared_WZ'
+
+// UnsafeShared.shared.unsafeMutableAddressor
+// Isolation: unspecified
+sil hidden [global_init] @$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvau : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = global_addr @$s17AdvancedIsolation12UnsafeSharedC6shared_Wz : $*Builtin.Word // user: %1
+  %1 = address_to_pointer %0 to $Builtin.RawPointer // user: %3
+  // function_ref one-time initialization function for shared
+  %2 = function_ref @$s17AdvancedIsolation12UnsafeSharedC6shared_WZ : $@convention(c) (Builtin.RawPointer) -> () // user: %3
+  %3 = builtin "once"(%1, %2) : $Builtin.SILToken // user: %4
+  %4 = global_addr @$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvpZ : $*NonSendable depends_on %3 // user: %5
+  %5 = address_to_pointer %4 to $Builtin.RawPointer // user: %6
+  return %5                                       // id: %6
+} // end sil function '$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvau'
+
+// static UnsafeShared.shared.getter
+// Isolation: nonisolated_unsafe
+sil hidden [transparent] @$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvgZ : $@convention(method) (@thick UnsafeShared.Type) -> @owned NonSendable {
+// %0 "self"                                      // user: %1
+bb0(%0 : $@thick UnsafeShared.Type):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  // function_ref UnsafeShared.shared.unsafeMutableAddressor
+  %2 = function_ref @$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvau : $@convention(thin) () -> Builtin.RawPointer // user: %3
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer // user: %4
+  %4 = pointer_to_address %3 to [strict] $*NonSendable // user: %5
+  %5 = begin_access [read] [dynamic] %4           // users: %6, %8
+  %6 = load %5                                    // users: %9, %7
+  strong_retain %6                                // id: %7
+  end_access %5                                   // id: %8
+  return %6                                       // id: %9
+} // end sil function '$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvgZ'
+
+// static UnsafeShared.shared.setter
+// Isolation: nonisolated_unsafe
+sil hidden [transparent] @$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvsZ : $@convention(method) (@owned NonSendable, @thick UnsafeShared.Type) -> () {
+// %0 "value"                                     // users: %13, %10, %7, %2
+// %1 "self"                                      // user: %3
+bb0(%0 : $NonSendable, %1 : $@thick UnsafeShared.Type):
+  debug_value %0, let, name "value", argno 1      // id: %2
+  debug_value %1, let, name "self", argno 2       // id: %3
+  // function_ref UnsafeShared.shared.unsafeMutableAddressor
+  %4 = function_ref @$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvau : $@convention(thin) () -> Builtin.RawPointer // user: %5
+  %5 = apply %4() : $@convention(thin) () -> Builtin.RawPointer // user: %6
+  %6 = pointer_to_address %5 to [strict] $*NonSendable // user: %8
+  strong_retain %0                                // id: %7
+  %8 = begin_access [modify] [dynamic] %6         // users: %10, %9, %12
+  %9 = load %8                                    // user: %11
+  store %0 to %8                                  // id: %10
+  strong_release %9                               // id: %11
+  end_access %8                                   // id: %12
+  strong_release %0                               // id: %13
+  %14 = tuple ()                                  // user: %15
+  return %14                                      // id: %15
+} // end sil function '$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvsZ'
+
+// static UnsafeShared.shared.modify
+// Isolation: nonisolated_unsafe
+sil hidden [transparent] @$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvMZ : $@yield_once @convention(method) (@thick UnsafeShared.Type) -> @yields @inout NonSendable {
+// %0 "self"                                      // user: %1
+bb0(%0 : $@thick UnsafeShared.Type):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  // function_ref UnsafeShared.shared.unsafeMutableAddressor
+  %2 = function_ref @$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvau : $@convention(thin) () -> Builtin.RawPointer // user: %3
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer // user: %4
+  %4 = pointer_to_address %3 to [strict] $*NonSendable // user: %5
+  %5 = begin_access [modify] [dynamic] %4         // users: %7, %10, %6
+  yield %5, resume bb1, unwind bb2                // id: %6
+
+bb1:                                              // Preds: bb0
+  end_access %5                                   // id: %7
+  %8 = tuple ()                                   // user: %9
+  return %8                                       // id: %9
+
+bb2:                                              // Preds: bb0
+  end_access %5                                   // id: %10
+  unwind                                          // id: %11
+} // end sil function '$s17AdvancedIsolation12UnsafeSharedC6sharedAA11NonSendableCvMZ'
+
+// UnsafeShared.deinit
+// Isolation: unspecified
+sil hidden @$s17AdvancedIsolation12UnsafeSharedCfd : $@convention(method) (@guaranteed UnsafeShared) -> @owned Builtin.NativeObject {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $UnsafeShared):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = unchecked_ref_cast %0 to $Builtin.NativeObject // user: %3
+  return %2                                       // id: %3
+} // end sil function '$s17AdvancedIsolation12UnsafeSharedCfd'
+
+// UnsafeShared.__deallocating_deinit
+// Isolation: nonisolated
+sil hidden @$s17AdvancedIsolation12UnsafeSharedCfD : $@convention(method) (@owned UnsafeShared) -> () {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $UnsafeShared):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  // function_ref UnsafeShared.deinit
+  %2 = function_ref @$s17AdvancedIsolation12UnsafeSharedCfd : $@convention(method) (@guaranteed UnsafeShared) -> @owned Builtin.NativeObject // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed UnsafeShared) -> @owned Builtin.NativeObject // user: %4
+  %4 = unchecked_ref_cast %3 to $UnsafeShared     // user: %5
+  dealloc_ref %4                                  // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6                                       // id: %7
+} // end sil function '$s17AdvancedIsolation12UnsafeSharedCfD'
+
+// UnsafeShared.__allocating_init()
+// Isolation: unspecified
+sil hidden [exact_self_class] @$s17AdvancedIsolation12UnsafeSharedCACycfC : $@convention(method) (@thick UnsafeShared.Type) -> @owned UnsafeShared {
+// %0 "$metatype"
+bb0(%0 : $@thick UnsafeShared.Type):
+  %1 = alloc_ref $UnsafeShared                    // user: %3
+  // function_ref UnsafeShared.init()
+  %2 = function_ref @$s17AdvancedIsolation12UnsafeSharedCACycfc : $@convention(method) (@owned UnsafeShared) -> @owned UnsafeShared // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@owned UnsafeShared) -> @owned UnsafeShared // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s17AdvancedIsolation12UnsafeSharedCACycfC'
+
+// UnsafeShared.init()
+// Isolation: unspecified
+sil hidden @$s17AdvancedIsolation12UnsafeSharedCACycfc : $@convention(method) (@owned UnsafeShared) -> @owned UnsafeShared {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $UnsafeShared):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = end_init_let_ref %0                        // user: %3
+  return %2                                       // id: %3
+} // end sil function '$s17AdvancedIsolation12UnsafeSharedCACycfc'
+
+// Array._endMutation()
+sil shared [_semantics "array.end_mutation"] @$sSa12_endMutationyyF : $@convention(method) <Element> (@inout Array<Element>) -> () {
+[%0: noescape! **]
+// %0                                             // users: %9, %1
+bb0(%0 : $*Array<Element>):
+  %1 = struct_element_addr %0, #Array._buffer     // user: %2
+  %2 = struct_element_addr %1, #_ArrayBuffer._storage // user: %3
+  %3 = struct_element_addr %2, #_BridgeStorage.rawValue // user: %4
+  %4 = load %3                                    // user: %5
+  %5 = end_cow_mutation %4                        // user: %6
+  %6 = struct $_BridgeStorage<__ContiguousArrayStorageBase> (%5) // user: %7
+  %7 = struct $_ArrayBuffer<Element> (%6)         // user: %8
+  %8 = struct $Array<Element> (%7)                // user: %9
+  store %8 to %0                                  // id: %9
+  %10 = tuple ()                                  // user: %11
+  return %10                                      // id: %11
+} // end sil function '$sSa12_endMutationyyF'
+
+sil_vtable NonSendable {
+  #NonSendable.value!getter: (NonSendable) -> () -> Int : @$s17AdvancedIsolation11NonSendableC5valueSivg	// NonSendable.value.getter
+  #NonSendable.value!setter: (NonSendable) -> (Int) -> () : @$s17AdvancedIsolation11NonSendableC5valueSivs	// NonSendable.value.setter
+  #NonSendable.value!modify: (NonSendable) -> () -> () : @$s17AdvancedIsolation11NonSendableC5valueSivM	// NonSendable.value.modify
+  #NonSendable.init!allocator: (NonSendable.Type) -> (Int) -> NonSendable : @$s17AdvancedIsolation11NonSendableC5valueACSi_tcfC	// NonSendable.__allocating_init(value:)
+  #NonSendable.deinit!deallocator: @$s17AdvancedIsolation11NonSendableCfD	// NonSendable.__deallocating_deinit
+}
+
+sil_vtable DataStore {
+  #DataStore.data!getter: (isolated DataStore) -> () -> NonSendable? : @$s17AdvancedIsolation9DataStoreC4dataAA11NonSendableCSgvg	// DataStore.data.getter
+  #DataStore.data!setter: (isolated DataStore) -> (NonSendable?) -> () : @$s17AdvancedIsolation9DataStoreC4dataAA11NonSendableCSgvs	// DataStore.data.setter
+  #DataStore.data!modify: (isolated DataStore) -> () -> () : @$s17AdvancedIsolation9DataStoreC4dataAA11NonSendableCSgvM	// DataStore.data.modify
+  #DataStore.store: (isolated DataStore) -> (NonSendable) -> () : @$s17AdvancedIsolation9DataStoreC5storeyyAA11NonSendableCF	// DataStore.store(_:)
+  #DataStore.load: (isolated DataStore) -> () -> NonSendable? : @$s17AdvancedIsolation9DataStoreC4loadAA11NonSendableCSgyF	// DataStore.load()
+  #DataStore.init!allocator: (DataStore.Type) -> () -> DataStore : @$s17AdvancedIsolation9DataStoreCACycfC	// DataStore.__allocating_init()
+  #DataStore.deinit!deallocator: @$s17AdvancedIsolation9DataStoreCfD	// DataStore.__deallocating_deinit
+}
+
+sil_vtable UnsafeShared {
+  #UnsafeShared.init!allocator: (UnsafeShared.Type) -> () -> UnsafeShared : @$s17AdvancedIsolation12UnsafeSharedCACycfC	// UnsafeShared.__allocating_init()
+  #UnsafeShared.deinit!deallocator: @$s17AdvancedIsolation12UnsafeSharedCfD	// UnsafeShared.__deallocating_deinit
+}
+
+sil_witness_table hidden DataStore: Actor module AdvancedIsolation {
+  method #Actor.unownedExecutor!getter: <Self where Self : Actor> (Self) -> () -> UnownedSerialExecutor : @$s17AdvancedIsolation9DataStoreCScAAAScA15unownedExecutorScevgTW	// protocol witness for Actor.unownedExecutor.getter in conformance DataStore
+}
+
+
+
+// Mappings from '#fileID' to '#filePath':
+//   'AdvancedIsolation/AdvancedIsolation.swift' => 'AdvancedIsolation.swift'
+
+

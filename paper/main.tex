@@ -1,0 +1,55 @@
+\documentclass[acmsmall,nonacm,screen,10pt]{acmart}
+\usepackage{preamble}
+
+%% ── Document metadata ─────────────────────────────────────
+
+\title{Swift Concurrency as a Capability-Region Type System}
+\subtitle{Capability, region, and affine transfer in Swift 6.2}
+
+\author{Yasuhiro Inami (@inamiy)}
+\thanks{This paper was produced with the assistance of Claude Opus 4.6 and GPT-5.4.}
+\affiliation{%
+  \institution{try! Swift Tokyo 2026}
+  \country{Japan}
+}
+\date{Apr 13, 2026}
+
+\authorsaddresses{}
+
+\begin{document}
+
+\begin{abstract}
+Swift Concurrency exposes programmers to individually sensible rules whose combined behavior is still difficult to predict from surface syntax alone. The hardest cases mix actor isolation, region-based isolation, \code{@Sendable}, \code{sending}, nonisolated async execution, and dynamic \code{@isolated(any)} function values. This paper presents a rule-level account of Swift~6.2 concurrency based on three ingredients: execution capability, value region, and affine environment update. Capability answers \emph{where} a computation runs. Region answers \emph{where} a non-\code{Sendable} value currently lives. Affine update explains \emph{why} a call may preserve access, refine a binding, or consume a value from the caller-side environment. The resulting account clarifies five recurring phenomena: same-isolation \code{sending} does not necessarily consume, ordinary same-isolation calls bind disconnected values into actor regions, cross-isolation results require an explicit \code{sending} asymmetry, \code{@isolated(any)} behaves as a dynamic isolation interface rather than an ordinary actor annotation, and \code{@nonisolated async} after SE-0461 inherits caller execution without collapsing into \code{@concurrent}~\cite{se0461}. The paper validates this model against a focused compiler probe suite covering conversion behavior, task capture, actor-instance closure inference, dynamic isolation identity, and result-transfer corner cases. The appendix prints the complete rule inventory so the paper serves as both an argument and a reference.
+\end{abstract}
+
+\keywords{Swift Concurrency, actor isolation, region-based isolation, \texttt{Sendable}, \texttt{sending}, \texttt{@isolated(any)}, type systems.}
+
+\maketitle
+{\small Last Update: April 13, 2026}
+\bigskip
+
+\input{sections/introduction}
+\input{sections/background}
+\input{sections/model}
+\input{sections/conversion-rules}
+\input{sections/kernel-rules}
+\input{sections/case-studies}
+\input{sections/validation}
+\input{sections/discussion}
+\input{sections/conclusion}
+
+\appendix
+\clearpage
+\input{sections/appendix-notation}
+\clearpage
+\input{sections/appendix-relation-and-boundary-rules}
+\clearpage
+\input{sections/appendix-full-typing-rules}
+\clearpage
+\input{sections/appendix-examples}
+
+\clearpage
+\bibliographystyle{ACM-Reference-Format}
+\bibliography{references}
+
+\end{document}

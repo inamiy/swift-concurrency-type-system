@@ -1,0 +1,163 @@
+\NeedsTeXFormat{LaTeX2e}
+\ProvidesPackage{preamble}[2026/04/08 Swift Concurrency paper macros]
+
+%% ── Math (amsmath/amssymb already loaded by acmart) ───────
+\RequirePackage{mathtools}
+\RequirePackage{stmaryrd}        % ⟦ ⟧
+\RequirePackage{microtype}
+\emergencystretch=2em
+
+%% ── Inference rules ───────────────────────────────────────
+\RequirePackage{mathpartir}
+
+%% ── Code listings ─────────────────────────────────────────
+\RequirePackage{listings}
+\RequirePackage{xcolor}
+
+\lstdefinelanguage{swift}{
+  keywords={actor,async,await,break,case,catch,class,continue,default,defer,
+    deinit,do,else,enum,extension,fallthrough,false,fileprivate,final,for,
+    func,guard,if,import,in,init,inout,internal,is,isolated,lazy,let,
+    mutating,nil,nonisolated,open,operator,override,private,protocol,
+    public,repeat,rethrows,return,self,sending,some,static,struct,subscript,
+    switch,super,Task,throw,throws,true,try,typealias,var,where,while},
+  comment=[l]{//},
+  morecomment=[s]{/*}{*/},
+  string=[b]",
+  sensitive=true,
+}
+
+\definecolor{swiftkw}{RGB}{170,13,145}
+\definecolor{swiftstr}{RGB}{196,26,22}
+\definecolor{swiftcmt}{RGB}{0,128,0}
+\definecolor{swiftframe}{gray}{0.65}
+
+\lstset{
+  language=swift,
+  basicstyle=\small\ttfamily,
+  keywordstyle=\color{swiftkw}\bfseries,
+  stringstyle=\color{swiftstr},
+  commentstyle=\color{swiftcmt}\itshape,
+  frame=single,
+  rulecolor=\color{swiftframe},
+  framesep=6pt,
+  breaklines=true,
+  showstringspaces=false,
+  tabsize=4,
+  columns=fullflexible,
+  keepspaces=true,
+  xleftmargin=6pt,
+  xrightmargin=6pt,
+  aboveskip=8pt,
+  belowskip=6pt,
+}
+
+%% ── Graphics & floats ─────────────────────────────────────
+\RequirePackage{graphicx}
+\RequirePackage{subcaption}
+\RequirePackage{booktabs}
+
+%% ── Hyperlinks (hyperref already loaded by acmart) ────────
+\RequirePackage[capitalise,noabbrev]{cleveref}
+
+%% ── Boxed environments ────────────────────────────────────
+\RequirePackage{amsthm}
+\RequirePackage[framemethod=TikZ]{mdframed}
+
+\mdfdefinestyle{formalbox}{
+  linewidth=0.45pt,
+  linecolor=gray!60,
+  innertopmargin=8pt,
+  innerbottommargin=8pt,
+  innerleftmargin=10pt,
+  innerrightmargin=10pt,
+  skipabove=10pt,
+  skipbelow=6pt,
+}
+
+\newmdenv[style=formalbox]{formalframe}
+
+\newenvironment{rulebox}[1]{%
+  \begin{formalframe}
+  \noindent\textbf{\textsc{Rule}}\hspace{0.55em}\textit{#1}\par\vspace{4pt}
+}{%
+  \end{formalframe}
+}
+
+\newenvironment{definitionbox}[1]{%
+  \begin{formalframe}
+  \noindent\textbf{\textsc{Definition}}\hspace{0.55em}\textit{#1}\par\vspace{4pt}
+}{%
+  \end{formalframe}
+}
+
+\newenvironment{propositionbox}[1]{%
+  \begin{formalframe}
+  \noindent\textbf{\textsc{Proposition}}\hspace{0.55em}\textit{#1}\par\vspace{4pt}
+}{%
+  \end{formalframe}
+}
+
+\newenvironment{contributionbox}{%
+  \begin{formalframe}
+  \noindent\textbf{\textsc{Contributions}}\par\vspace{4pt}
+}{%
+  \end{formalframe}
+}
+
+%% ── Inference rule with right-aligned name ────────────────
+\newcommand{\typerule}[3]{%
+  \[
+  \inferrule*{#2}{#3}
+  \]
+  \noindent\makebox[\linewidth][r]{(\textsc{#1})}\par
+  \vspace{0.35\baselineskip}%
+}
+
+%% ── Displayed equation shorthand ──────────────────────────
+\newcommand{\displayeq}[1]{\[\displaystyle #1\]}
+
+%% ── Semantic function / predicate names ───────────────────
+\newcommand{\at}{\text{ at }}
+\newcommand{\Accessible}{\textsf{accessible}}
+\newcommand{\Capturable}{\textsf{capturable}}
+\newcommand{\canSend}{\textsf{canSend}}
+\newcommand{\toCapability}{\textsf{toCapability}}
+\newcommand{\toRegion}{\textsf{toRegion}}
+\newcommand{\isActorIsolated}{\textsf{isActorIsolated}}
+\newcommand{\isAllSendable}{\textsf{isAllSendable}}
+\newcommand{\isNonLocal}{\textsf{isNonLocal}}
+\newcommand{\instanceMethods}{\textsf{instanceMethods}}
+\newcommand{\hasIsolatedKeyPathComponent}{\textsf{hasIsolatedKeyPathComponent}}
+\newcommand{\inheritActorContext}{\textsf{inheritActorContext}}
+\newcommand{\isPassedToSendingParameter}{\textsf{isPassedToSendingParameter}}
+\newcommand{\capturesIsolatedParam}{\textsf{capturesIsolatedParam}}
+\newcommand{\effectiveClosureCapability}{\textsf{effectiveClosureCapability}}
+\newcommand{\isoSubtyping}{\textsf{isoSubtyping}}
+\newcommand{\isoCoercion}{\textsf{isoCoercion}}
+\newcommand{\isAsyncLet}{\textsf{isAsyncLet}}
+\newcommand{\undosend}{\textsf{undoSend}}
+
+%% ── Region / isolation names ──────────────────────────────
+\newcommand{\disconnected}{\textsf{disconnected}}
+\newcommand{\isolated}{\textsf{isolated}}
+\newcommand{\task}{\textsf{task}}
+\newcommand{\invalid}{\textsf{invalid}}
+\newcommand{\sending}{\textsf{sending}}
+
+%% ── Inline code shorthand ─────────────────────────────────
+\newcommand{\code}[1]{\texttt{#1}}
+
+%% ── Swift code file inclusion ─────────────────────────────
+\newcommand{\codefile}[1]{\lstinputlisting[language=swift]{#1}}
+
+%% ── Paper figure shorthand ────────────────────────────────
+\newcommand{\paperfigure}[3][1.0]{%
+  \begin{figure}[htbp]
+    \centering
+    \includegraphics[width=#1\linewidth]{#2}
+    \caption{#3}
+  \end{figure}
+}
+
+\endinput

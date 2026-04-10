@@ -1,0 +1,121 @@
+\section{Boundary and Relation Rules}
+\label{sec:appendix-relation}
+
+This appendix prints the non-expression rules that determine body capability, ambient async mode, and relation-level conversion structure.
+
+\subsection{Sync and Async Boundaries}
+
+\subsubsection{\textsc{decl-fun}}
+
+\typerule{decl-fun}
+  {\Gamma_{\mathit{body}} = x_1 : A_1 \at \rho_1, \ldots, x_n : A_n \at \rho_n \\
+   @\kappa = \toCapability(\mathrm{proj}_\iota(@\varphi)) \\
+   \Gamma_{\mathit{body}};\; @\kappa;\; \alpha \vdash \mathit{body} : R \at \rho \dashv \Gamma'_{\mathit{body}}}
+  {\Delta \vdash_d @\varphi\; \mathbf{func}\; \mathit{foo}(x_1 : A_1, \ldots, x_n : A_n)\; \alpha \to R\; \{\mathit{body}\}}
+
+For nonisolated bodies (sync and async alike), non-\code{Sendable} parameters are initialized in region $\task$. The $\task$ region represents caller-owned data not bound to any specific actor; even in the sync case, the function may be called from any isolation context, so assigning parameters to a specific actor domain is not statically safe. This is the source of the later capture restrictions discussed in the main body.
+
+\subsubsection{\textsc{decl-fun-isolated-param}}
+
+\typerule{decl-fun-isolated-param}
+  {a : \mathit{ActorType},\; \Gamma_{\mathit{body}} = a : \mathit{ActorType} \at \mathunderscore,\; x_1 : A_1 \at \rho_1, \ldots, x_n : A_n \at \rho_n \\
+   \Gamma_{\mathit{body}};\; @\isolated(a);\; \alpha \vdash \mathit{body} : R \at \rho \dashv \Gamma'_{\mathit{body}}}
+  {\Delta \vdash_d \mathbf{func}\; \mathit{foo}(\mathit{actor} : \mathbf{isolated}\; \mathit{ActorType}, x_1 : A_1, \ldots)\; \alpha \to R\; \{\mathit{body}\}}
+
+\subsubsection{\textsc{decl-fun-isolation-inheriting}}
+
+\typerule{decl-fun-isolation-inheriting}
+  {\Gamma_{\mathit{body}} = \mathit{iso} : (\mathbf{any}\; \mathit{Actor})? \at \mathunderscore,\; x_1 : A_1 \at \rho_1, \ldots, x_n : A_n \at \rho_n \\
+   \Gamma_{\mathit{body}};\; @\textsf{nonisolated};\; \alpha \vdash \mathit{body} : R \at \rho \dashv \Gamma'_{\mathit{body}}}
+  {\Delta \vdash_d \mathbf{func}\; \mathit{foo}(\mathit{isolation} : \mathbf{isolated}\; (\mathbf{any}\; \mathit{Actor})? = \texttt{\#isolation}, x_1 : A_1, \ldots)\; \alpha \to R\; \{\mathit{body}\}}
+
+\subsubsection{\code{Task} and \code{Task.detached} bodies}
+
+\code{Task} bodies are checked under $\alpha = \mathit{async}$. Their closure parameters are also \code{sending}, so closure capture follows the same \textsc{closure-sending-*} rules printed in Appendix~\ref{sec:appendix-full}. \code{Task.init} differs from \code{Task.detached} because the former may inherit caller actor context through \code{@\_inheritActorContext}, while the latter never does.
+
+\subsection{Relation Rules}
+
+The formalization distinguishes semantic subtyping from one-step contextual coercion.
+
+\begin{itemize}
+  \item $\isoSubtyping$: a semantic relation that may compose transitively
+  \item $\isoCoercion$: a one-step direct coercion judgment used by \textsc{func-conv}
+\end{itemize}
+
+\subsubsection{Isolation Subtyping}
+
+\paragraph{\textsc{iso-subtyping-identity}}
+\[
+  \isoSubtyping(@\sigma, \iota, @\sigma, \iota, \alpha')
+\]
+
+\paragraph{\textsc{iso-subtyping-sendable-forget}}
+\[
+  \isoSubtyping(@\textsf{Sendable}, \iota, \cdot, \iota, \alpha')
+\]
+
+\paragraph{\textsc{iso-subtyping-nonisolated-to-isolated-any}}
+\[
+  \isoSubtyping(@\sigma, @\textsf{nonisolated}, @\sigma, @\textsf{isolated(any)}, \alpha')
+\]
+
+\paragraph{\textsc{iso-subtyping-mainactor-to-isolated-any}}
+\[
+  \isoSubtyping(@\sigma, @\textsf{MainActor}, @\sigma, @\textsf{isolated(any)}, \alpha')
+\]
+
+\paragraph{\textsc{iso-subtyping-mainactor-implicit-sendable}}
+\[
+  \isoSubtyping(\cdot, @\textsf{MainActor}, @\textsf{Sendable}, @\textsf{MainActor}, \alpha')
+\]
+
+\paragraph{\textsc{iso-subtyping-isolated-local-actor-identity}}
+\[
+  \isoSubtyping(@\sigma, @\isolated(\mathit{localActor}), @\sigma, @\isolated(\mathit{localActor}), \alpha')
+\]
+
+\paragraph{\textsc{iso-subtyping-isolated-local-actor-sendable-forget}}
+\[
+  \isoSubtyping(@\textsf{Sendable}, @\isolated(\mathit{localActor}), \cdot, @\isolated(\mathit{localActor}), \alpha')
+\]
+
+\paragraph{\textsc{iso-subtyping-transitive}}
+
+\typerule{iso-subtyping-transitive}
+  {\isoSubtyping(@\sigma_1, \iota_1, @\sigma_2, \iota_2, \alpha') \\
+   \isoSubtyping(@\sigma_2, \iota_2, @\sigma_3, \iota_3, \alpha')}
+  {\isoSubtyping(@\sigma_1, \iota_1, @\sigma_3, \iota_3, \alpha')}
+
+\paragraph{\textsc{iso-subtyping-to-coercion}}
+
+\typerule{iso-subtyping-to-coercion}
+  {\isoSubtyping(@\sigma_1, \iota_1, @\sigma_2, \iota_2, \alpha')}
+  {\isoCoercion(@\sigma_1, \iota_1, @\sigma_2, \iota_2, \alpha')}
+
+\subsubsection{Isolation Coercion}
+
+\paragraph{\textsc{iso-coercion-isolated-any-to-nonisolated-deprecated}}
+\[
+  \isoCoercion(@\sigma, @\textsf{isolated(any)}, @\sigma, @\textsf{nonisolated}, \mathit{sync})
+\]
+
+\paragraph{\textsc{iso-coercion-sendable-nonisolated-universal}}
+
+\typerule{iso-coercion-sendable-nonisolated-universal}
+  {\iota_2 \neq @\isolated(\mathit{localActor})}
+  {\isoCoercion(@\textsf{Sendable}, @\textsf{nonisolated}, @\sigma_2, \iota_2, \alpha')}
+
+\paragraph{\textsc{iso-coercion-async-mainactor-universal}}
+
+\typerule{iso-coercion-async-mainactor-universal}
+  {\iota_2 \neq @\isolated(\mathit{localActor})}
+  {\isoCoercion(@\sigma, @\textsf{MainActor}, @\sigma_2, \iota_2, \mathit{async})}
+
+\paragraph{\textsc{iso-coercion-async-nonsendable-equiv}}
+
+\typerule{iso-coercion-async-nonsendable-equiv}
+  {\iota_1 \in \{@\textsf{nonisolated}, @\textsf{concurrent}, @\textsf{isolated(any)}\} \\
+   \iota_2 \in \{@\textsf{nonisolated}, @\textsf{concurrent}, @\textsf{isolated(any)}\}}
+  {\isoCoercion(\cdot, \iota_1, \cdot, \iota_2, \mathit{async})}
+
+The conversion matrices in the source formalization remain relevant because not every successful local conversion is a one-step coercion judgment. Actor-parameter branches and several \code{@isolated(any)}-to-actor conversions require explicit closure wrapping and therefore belong to the term-level conversion story rather than to direct relation rules alone.

@@ -1,0 +1,650 @@
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+@MainActor func mainActorFunc()
+
+@MainActor func mainActorFuncWithArg(_ x: Int) -> Int
+
+func regularFunc()
+
+actor MyActor {
+  @_hasStorage @_hasInitialValue var value: Int { get set }
+  func actorMethod() -> Int
+  nonisolated func nonisolatedMethod() -> String
+  @objc deinit
+  init()
+  @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+  @_semantics("defaultActor") nonisolated final var unownedExecutor: UnownedSerialExecutor {
+    get
+  }
+}
+
+@globalActor struct CustomGlobalActor {
+  actor ActorType {
+    @objc deinit
+    init()
+    @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+    @_semantics("defaultActor") nonisolated final var unownedExecutor: UnownedSerialExecutor {
+      get
+    }
+  }
+  @_hasStorage @_hasInitialValue static let shared: CustomGlobalActor.ActorType { get }
+  init()
+}
+
+@CustomGlobalActor func customActorFunc()
+
+// one-time initialization token for shared
+sil_global private @$s14ActorIsolation012CustomGlobalA0V6shared_Wz : $Builtin.Word
+
+// static CustomGlobalActor.shared
+sil_global hidden [let] @$s14ActorIsolation012CustomGlobalA0V6sharedAC0A4TypeCvpZ : $CustomGlobalActor.ActorType
+
+// main
+// Isolation: unspecified
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %2 = integer_literal $Builtin.Int32, 0          // user: %3
+  %3 = struct $Int32 (%2)                         // user: %4
+  return %3                                       // id: %4
+} // end sil function 'main'
+
+// mainActorFunc()
+// Isolation: global_actor. type: MainActor
+sil hidden @$s14ActorIsolation04mainA4FuncyyF : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 1           // user: %2
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %1 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %2
+  %2 = apply %1<Any>(%0) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %4, %3
+  %3 = tuple_extract %2, 0                        // users: %5, %16
+  %4 = tuple_extract %2, 1                        // user: %5
+  %5 = mark_dependence %4 on %3                   // user: %6
+  %6 = pointer_to_address %5 to [strict] $*Any    // user: %13
+  %7 = string_literal utf8 "Hello from MainActor" // user: %12
+  %8 = integer_literal $Builtin.Word, 20          // user: %12
+  %9 = integer_literal $Builtin.Int1, -1          // user: %12
+  %10 = metatype $@thin String.Type               // user: %12
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %11 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %12
+  %12 = apply %11(%7, %8, %9, %10) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %13 = init_existential_addr %6, $String         // user: %14
+  store %12 to %13                                // id: %14
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %15 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %16
+  %16 = apply %15<Any>(%3) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %25, %22
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %17 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %18
+  %18 = apply %17() : $@convention(thin) () -> @owned String // users: %24, %22
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %19 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %20
+  %20 = apply %19() : $@convention(thin) () -> @owned String // users: %23, %22
+  // function_ref print(_:separator:terminator:)
+  %21 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %22
+  %22 = apply %21(%16, %18, %20) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %20                               // id: %23
+  release_value %18                               // id: %24
+  release_value %16                               // id: %25
+  %26 = tuple ()                                  // user: %27
+  return %26                                      // id: %27
+} // end sil function '$s14ActorIsolation04mainA4FuncyyF'
+
+// _allocateUninitializedArray<A>(_:)
+// Isolation: unspecified
+sil [always_inline] [_semantics "array.uninitialized_intrinsic"] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <Element> (Builtin.Word) -> (@owned Array<Element>, Builtin.RawPointer)
+
+// String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+// Isolation: unspecified
+sil [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+
+// _finalizeUninitializedArray<A>(_:)
+// Isolation: unspecified
+sil shared [readnone] [_semantics "array.finalize_intrinsic"] @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <Element> (@owned Array<Element>) -> @owned Array<Element> {
+[%0: escape! v** => %r.v**, escape! v**.c*.v** => %r.v**.c*.v**]
+// %0                                             // user: %2
+bb0(%0 : $Array<Element>):
+  %1 = alloc_stack [var_decl] $Array<Element>     // users: %5, %2, %6, %4
+  store %0 to %1                                  // id: %2
+  // function_ref Array._endMutation()
+  %3 = function_ref @$sSa12_endMutationyyF : $@convention(method) <τ_0_0> (@inout Array<τ_0_0>) -> () // user: %4
+  %4 = apply %3<Element>(%1) : $@convention(method) <τ_0_0> (@inout Array<τ_0_0>) -> ()
+  %5 = load %1                                    // user: %7
+  dealloc_stack %1                                // id: %6
+  return %5                                       // id: %7
+} // end sil function '$ss27_finalizeUninitializedArrayySayxGABnlF'
+
+// default argument 1 of print(_:separator:terminator:)
+// Isolation: unspecified
+sil shared @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String {
+bb0:
+  %0 = string_literal utf8 " "                    // user: %5
+  %1 = integer_literal $Builtin.Word, 1           // user: %5
+  %2 = integer_literal $Builtin.Int1, -1          // user: %5
+  %3 = metatype $@thin String.Type                // user: %5
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %5
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %6
+  return %5                                       // id: %6
+} // end sil function '$ss5print_9separator10terminatoryypd_S2StFfA0_'
+
+// default argument 2 of print(_:separator:terminator:)
+// Isolation: unspecified
+sil shared @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String {
+bb0:
+  %0 = string_literal utf8 "\n"                   // user: %5
+  %1 = integer_literal $Builtin.Word, 1           // user: %5
+  %2 = integer_literal $Builtin.Int1, -1          // user: %5
+  %3 = metatype $@thin String.Type                // user: %5
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %5
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %6
+  return %5                                       // id: %6
+} // end sil function '$ss5print_9separator10terminatoryypd_S2StFfA1_'
+
+// print(_:separator:terminator:)
+// Isolation: unspecified
+sil @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+
+// mainActorFuncWithArg(_:)
+// Isolation: global_actor. type: MainActor
+sil hidden @$s14ActorIsolation04mainA11FuncWithArgyS2iF : $@convention(thin) (Int) -> Int {
+// %0 "x"                                         // users: %3, %1
+bb0(%0 : $Int):
+  debug_value %0, let, name "x", argno 1          // id: %1
+  %2 = integer_literal $Builtin.Int64, 1          // user: %5
+  %3 = struct_extract %0, #Int._value             // user: %5
+  %4 = integer_literal $Builtin.Int1, -1          // user: %5
+  %5 = builtin "sadd_with_overflow_Int64"(%3, %2, %4) : $(Builtin.Int64, Builtin.Int1) // users: %7, %6
+  %6 = tuple_extract %5, 0                        // user: %9
+  %7 = tuple_extract %5, 1                        // user: %8
+  cond_fail %7, "arithmetic overflow"             // id: %8
+  %9 = struct $Int (%6)                           // user: %10
+  return %9                                       // id: %10
+} // end sil function '$s14ActorIsolation04mainA11FuncWithArgyS2iF'
+
+// Int.init(_builtinIntegerLiteral:)
+// Isolation: unspecified
+sil public_external [transparent] @$sSi22_builtinIntegerLiteralSiBI_tcfC : $@convention(method) (Builtin.IntLiteral, @thin Int.Type) -> Int {
+// %0                                             // user: %2
+bb0(%0 : $Builtin.IntLiteral, %1 : $@thin Int.Type):
+  %2 = builtin "s_to_s_checked_trunc_IntLiteral_Int64"(%0) : $(Builtin.Int64, Builtin.Int1) // user: %3
+  %3 = tuple_extract %2, 0                        // user: %4
+  %4 = struct $Int (%3)                           // user: %5
+  return %4                                       // id: %5
+} // end sil function '$sSi22_builtinIntegerLiteralSiBI_tcfC'
+
+// static Int.+ infix(_:_:)
+// Isolation: unspecified
+sil public_external [transparent] @$sSi1poiyS2i_SitFZ : $@convention(method) (Int, Int, @thin Int.Type) -> Int {
+// %0                                             // user: %3
+// %1                                             // user: %4
+bb0(%0 : $Int, %1 : $Int, %2 : $@thin Int.Type):
+  %3 = struct_extract %0, #Int._value             // user: %6
+  %4 = struct_extract %1, #Int._value             // user: %6
+  %5 = integer_literal $Builtin.Int1, -1          // user: %6
+  %6 = builtin "sadd_with_overflow_Int64"(%3, %4, %5) : $(Builtin.Int64, Builtin.Int1) // users: %8, %7
+  %7 = tuple_extract %6, 0                        // user: %10
+  %8 = tuple_extract %6, 1                        // user: %9
+  cond_fail %8, "arithmetic overflow"             // id: %9
+  %10 = struct $Int (%7)                          // user: %11
+  return %10                                      // id: %11
+} // end sil function '$sSi1poiyS2i_SitFZ'
+
+// regularFunc()
+// Isolation: unspecified
+sil hidden @$s14ActorIsolation11regularFuncyyF : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 1           // user: %2
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %1 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %2
+  %2 = apply %1<Any>(%0) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %4, %3
+  %3 = tuple_extract %2, 0                        // users: %5, %16
+  %4 = tuple_extract %2, 1                        // user: %5
+  %5 = mark_dependence %4 on %3                   // user: %6
+  %6 = pointer_to_address %5 to [strict] $*Any    // user: %13
+  %7 = string_literal utf8 "Hello from regular func" // user: %12
+  %8 = integer_literal $Builtin.Word, 23          // user: %12
+  %9 = integer_literal $Builtin.Int1, -1          // user: %12
+  %10 = metatype $@thin String.Type               // user: %12
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %11 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %12
+  %12 = apply %11(%7, %8, %9, %10) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %13 = init_existential_addr %6, $String         // user: %14
+  store %12 to %13                                // id: %14
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %15 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %16
+  %16 = apply %15<Any>(%3) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %25, %22
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %17 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %18
+  %18 = apply %17() : $@convention(thin) () -> @owned String // users: %24, %22
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %19 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %20
+  %20 = apply %19() : $@convention(thin) () -> @owned String // users: %23, %22
+  // function_ref print(_:separator:terminator:)
+  %21 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %22
+  %22 = apply %21(%16, %18, %20) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %20                               // id: %23
+  release_value %18                               // id: %24
+  release_value %16                               // id: %25
+  %26 = tuple ()                                  // user: %27
+  return %26                                      // id: %27
+} // end sil function '$s14ActorIsolation11regularFuncyyF'
+
+// variable initialization expression of MyActor.value
+// Isolation: unspecified
+sil hidden [transparent] @$s14ActorIsolation02MyA0C5valueSivpfi : $@convention(thin) () -> Int {
+bb0:
+  %0 = integer_literal $Builtin.Int64, 0          // user: %1
+  %1 = struct $Int (%0)                           // user: %2
+  return %1                                       // id: %2
+} // end sil function '$s14ActorIsolation02MyA0C5valueSivpfi'
+
+// MyActor.value.getter
+// Isolation: actor_instance. name: 'self'
+sil hidden [transparent] @$s14ActorIsolation02MyA0C5valueSivg : $@convention(method) (@sil_isolated @guaranteed MyActor) -> Int {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $MyActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = ref_element_addr %0, #MyActor.value        // user: %3
+  %3 = begin_access [read] [dynamic] %2           // users: %4, %5
+  %4 = load %3                                    // user: %6
+  end_access %3                                   // id: %5
+  return %4                                       // id: %6
+} // end sil function '$s14ActorIsolation02MyA0C5valueSivg'
+
+// MyActor.value.setter
+// Isolation: actor_instance. name: 'self'
+sil hidden [transparent] @$s14ActorIsolation02MyA0C5valueSivs : $@convention(method) (Int, @sil_isolated @guaranteed MyActor) -> () {
+// %0 "value"                                     // users: %6, %2
+// %1 "self"                                      // users: %4, %3
+bb0(%0 : $Int, %1 : $MyActor):
+  debug_value %0, let, name "value", argno 1      // id: %2
+  debug_value %1, let, name "self", argno 2       // id: %3
+  %4 = ref_element_addr %1, #MyActor.value        // user: %5
+  %5 = begin_access [modify] [dynamic] %4         // users: %6, %7
+  store %0 to %5                                  // id: %6
+  end_access %5                                   // id: %7
+  %8 = tuple ()                                   // user: %9
+  return %8                                       // id: %9
+} // end sil function '$s14ActorIsolation02MyA0C5valueSivs'
+
+// MyActor.value.modify
+// Isolation: actor_instance. name: 'self'
+sil hidden [transparent] @$s14ActorIsolation02MyA0C5valueSivM : $@yield_once @convention(method) (@sil_isolated @guaranteed MyActor) -> @yields @inout Int {
+// %0 "self"                                      // users: %2, %1
+bb0(%0 : $MyActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = ref_element_addr %0, #MyActor.value        // user: %3
+  %3 = begin_access [modify] [dynamic] %2         // users: %5, %8, %4
+  yield %3, resume bb1, unwind bb2                // id: %4
+
+bb1:                                              // Preds: bb0
+  end_access %3                                   // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6                                       // id: %7
+
+bb2:                                              // Preds: bb0
+  end_access %3                                   // id: %8
+  unwind                                          // id: %9
+} // end sil function '$s14ActorIsolation02MyA0C5valueSivM'
+
+// MyActor.actorMethod()
+// Isolation: actor_instance. name: 'self'
+sil hidden @$s14ActorIsolation02MyA0C11actorMethodSiyF : $@convention(method) (@sil_isolated @guaranteed MyActor) -> Int {
+// %0 "self"                                      // users: %3, %2, %1
+bb0(%0 : $MyActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = class_method %0, #MyActor.value!getter : (isolated MyActor) -> () -> Int, $@convention(method) (@sil_isolated @guaranteed MyActor) -> Int // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@sil_isolated @guaranteed MyActor) -> Int // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s14ActorIsolation02MyA0C11actorMethodSiyF'
+
+// MyActor.nonisolatedMethod()
+// Isolation: nonisolated
+sil hidden @$s14ActorIsolation02MyA0C17nonisolatedMethodSSyF : $@convention(method) (@guaranteed MyActor) -> @owned String {
+// %0 "self"                                      // user: %1
+bb0(%0 : $MyActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = string_literal utf8 "nonisolated"          // user: %7
+  %3 = integer_literal $Builtin.Word, 11          // user: %7
+  %4 = integer_literal $Builtin.Int1, -1          // user: %7
+  %5 = metatype $@thin String.Type                // user: %7
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %6 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %7
+  %7 = apply %6(%2, %3, %4, %5) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %8
+  return %7                                       // id: %8
+} // end sil function '$s14ActorIsolation02MyA0C17nonisolatedMethodSSyF'
+
+// MyActor.deinit
+// Isolation: unspecified
+sil hidden @$s14ActorIsolation02MyA0Cfd : $@convention(method) (@guaranteed MyActor) -> @owned Builtin.NativeObject {
+// %0 "self"                                      // users: %3, %2, %1
+bb0(%0 : $MyActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = builtin "destroyDefaultActor"(%0) : $()
+  %3 = unchecked_ref_cast %0 to $Builtin.NativeObject // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s14ActorIsolation02MyA0Cfd'
+
+// MyActor.__deallocating_deinit
+// Isolation: nonisolated
+sil hidden @$s14ActorIsolation02MyA0CfD : $@convention(method) (@owned MyActor) -> () {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $MyActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  // function_ref MyActor.deinit
+  %2 = function_ref @$s14ActorIsolation02MyA0Cfd : $@convention(method) (@guaranteed MyActor) -> @owned Builtin.NativeObject // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed MyActor) -> @owned Builtin.NativeObject // user: %4
+  %4 = unchecked_ref_cast %3 to $MyActor          // user: %5
+  dealloc_ref %4                                  // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6                                       // id: %7
+} // end sil function '$s14ActorIsolation02MyA0CfD'
+
+// MyActor.__allocating_init()
+// Isolation: nonisolated
+sil hidden [exact_self_class] @$s14ActorIsolation02MyA0CACycfC : $@convention(method) (@thick MyActor.Type) -> @owned MyActor {
+// %0 "$metatype"
+bb0(%0 : $@thick MyActor.Type):
+  %1 = alloc_ref $MyActor                         // user: %3
+  // function_ref MyActor.init()
+  %2 = function_ref @$s14ActorIsolation02MyA0CACycfc : $@convention(method) (@owned MyActor) -> @owned MyActor // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@owned MyActor) -> @owned MyActor // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s14ActorIsolation02MyA0CACycfC'
+
+// MyActor.init()
+// Isolation: nonisolated
+sil hidden @$s14ActorIsolation02MyA0CACycfc : $@convention(method) (@owned MyActor) -> @owned MyActor {
+// %0 "self"                                      // users: %3, %2, %1
+bb0(%0 : $MyActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = builtin "initializeDefaultActor"(%0) : $()
+  %3 = end_init_let_ref %0                        // users: %4, %8
+  %4 = ref_element_addr %3, #MyActor.value        // user: %7
+  %5 = integer_literal $Builtin.Int64, 0          // user: %6
+  %6 = struct $Int (%5)                           // user: %7
+  store %6 to %4                                  // id: %7
+  return %3                                       // id: %8
+} // end sil function '$s14ActorIsolation02MyA0CACycfc'
+
+// MyActor.unownedExecutor.getter
+// Isolation: nonisolated
+sil hidden [available 10.15] [_semantics "defaultActor"] @$s14ActorIsolation02MyA0C15unownedExecutorScevg : $@convention(method) (@guaranteed MyActor) -> UnownedSerialExecutor {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $MyActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = metatype $@thin UnownedSerialExecutor.Type // user: %5
+  %3 = builtin "buildDefaultActorExecutorRef"<MyActor>(%0) : $Builtin.Executor // user: %5
+  // function_ref UnownedSerialExecutor.init(_:)
+  %4 = function_ref @$sSceySceBecfC : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor // user: %5
+  %5 = apply %4(%3, %2) : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor // user: %6
+  return %5                                       // id: %6
+} // end sil function '$s14ActorIsolation02MyA0C15unownedExecutorScevg'
+
+// UnownedSerialExecutor.init(_:)
+// Isolation: unspecified
+sil [available 12.0.0] @$sSceySceBecfC : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor
+
+// protocol witness for Actor.unownedExecutor.getter in conformance MyActor
+// Isolation: nonisolated
+sil private [transparent] [thunk] @$s14ActorIsolation02MyA0CScAAAScA15unownedExecutorScevgTW : $@convention(witness_method: Actor) (@guaranteed MyActor) -> UnownedSerialExecutor {
+// %0                                             // user: %2
+bb0(%0 : $MyActor):
+  // function_ref MyActor.unownedExecutor.getter
+  %1 = function_ref @$s14ActorIsolation02MyA0C15unownedExecutorScevg : $@convention(method) (@guaranteed MyActor) -> UnownedSerialExecutor // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed MyActor) -> UnownedSerialExecutor // user: %3
+  return %2                                       // id: %3
+} // end sil function '$s14ActorIsolation02MyA0CScAAAScA15unownedExecutorScevgTW'
+
+// CustomGlobalActor.ActorType.deinit
+// Isolation: unspecified
+sil hidden @$s14ActorIsolation012CustomGlobalA0V0A4TypeCfd : $@convention(method) (@guaranteed CustomGlobalActor.ActorType) -> @owned Builtin.NativeObject {
+// %0 "self"                                      // users: %3, %2, %1
+bb0(%0 : $CustomGlobalActor.ActorType):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = builtin "destroyDefaultActor"(%0) : $()
+  %3 = unchecked_ref_cast %0 to $Builtin.NativeObject // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s14ActorIsolation012CustomGlobalA0V0A4TypeCfd'
+
+// CustomGlobalActor.ActorType.__deallocating_deinit
+// Isolation: nonisolated
+sil hidden @$s14ActorIsolation012CustomGlobalA0V0A4TypeCfD : $@convention(method) (@owned CustomGlobalActor.ActorType) -> () {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $CustomGlobalActor.ActorType):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  // function_ref CustomGlobalActor.ActorType.deinit
+  %2 = function_ref @$s14ActorIsolation012CustomGlobalA0V0A4TypeCfd : $@convention(method) (@guaranteed CustomGlobalActor.ActorType) -> @owned Builtin.NativeObject // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed CustomGlobalActor.ActorType) -> @owned Builtin.NativeObject // user: %4
+  %4 = unchecked_ref_cast %3 to $CustomGlobalActor.ActorType // user: %5
+  dealloc_ref %4                                  // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6                                       // id: %7
+} // end sil function '$s14ActorIsolation012CustomGlobalA0V0A4TypeCfD'
+
+// CustomGlobalActor.ActorType.__allocating_init()
+// Isolation: nonisolated
+sil hidden [exact_self_class] @$s14ActorIsolation012CustomGlobalA0V0A4TypeCAEycfC : $@convention(method) (@thick CustomGlobalActor.ActorType.Type) -> @owned CustomGlobalActor.ActorType {
+// %0 "$metatype"
+bb0(%0 : $@thick CustomGlobalActor.ActorType.Type):
+  %1 = alloc_ref $CustomGlobalActor.ActorType     // user: %3
+  // function_ref CustomGlobalActor.ActorType.init()
+  %2 = function_ref @$s14ActorIsolation012CustomGlobalA0V0A4TypeCAEycfc : $@convention(method) (@owned CustomGlobalActor.ActorType) -> @owned CustomGlobalActor.ActorType // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@owned CustomGlobalActor.ActorType) -> @owned CustomGlobalActor.ActorType // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s14ActorIsolation012CustomGlobalA0V0A4TypeCAEycfC'
+
+// CustomGlobalActor.ActorType.init()
+// Isolation: nonisolated
+sil hidden @$s14ActorIsolation012CustomGlobalA0V0A4TypeCAEycfc : $@convention(method) (@owned CustomGlobalActor.ActorType) -> @owned CustomGlobalActor.ActorType {
+// %0 "self"                                      // users: %3, %2, %1
+bb0(%0 : $CustomGlobalActor.ActorType):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = builtin "initializeDefaultActor"(%0) : $()
+  %3 = end_init_let_ref %0                        // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s14ActorIsolation012CustomGlobalA0V0A4TypeCAEycfc'
+
+// CustomGlobalActor.ActorType.unownedExecutor.getter
+// Isolation: nonisolated
+sil hidden [available 10.15] [_semantics "defaultActor"] @$s14ActorIsolation012CustomGlobalA0V0A4TypeC15unownedExecutorScevg : $@convention(method) (@guaranteed CustomGlobalActor.ActorType) -> UnownedSerialExecutor {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $CustomGlobalActor.ActorType):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = metatype $@thin UnownedSerialExecutor.Type // user: %5
+  %3 = builtin "buildDefaultActorExecutorRef"<CustomGlobalActor.ActorType>(%0) : $Builtin.Executor // user: %5
+  // function_ref UnownedSerialExecutor.init(_:)
+  %4 = function_ref @$sSceySceBecfC : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor // user: %5
+  %5 = apply %4(%3, %2) : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor // user: %6
+  return %5                                       // id: %6
+} // end sil function '$s14ActorIsolation012CustomGlobalA0V0A4TypeC15unownedExecutorScevg'
+
+// protocol witness for Actor.unownedExecutor.getter in conformance CustomGlobalActor.ActorType
+// Isolation: nonisolated
+sil private [transparent] [thunk] @$s14ActorIsolation012CustomGlobalA0V0A4TypeCScAAAScA15unownedExecutorScevgTW : $@convention(witness_method: Actor) (@guaranteed CustomGlobalActor.ActorType) -> UnownedSerialExecutor {
+// %0                                             // user: %2
+bb0(%0 : $CustomGlobalActor.ActorType):
+  // function_ref CustomGlobalActor.ActorType.unownedExecutor.getter
+  %1 = function_ref @$s14ActorIsolation012CustomGlobalA0V0A4TypeC15unownedExecutorScevg : $@convention(method) (@guaranteed CustomGlobalActor.ActorType) -> UnownedSerialExecutor // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed CustomGlobalActor.ActorType) -> UnownedSerialExecutor // user: %3
+  return %2                                       // id: %3
+} // end sil function '$s14ActorIsolation012CustomGlobalA0V0A4TypeCScAAAScA15unownedExecutorScevgTW'
+
+// one-time initialization function for shared
+sil private [global_init_once_fn] @$s14ActorIsolation012CustomGlobalA0V6shared_WZ : $@convention(c) (Builtin.RawPointer) -> () {
+bb0(%0 : $Builtin.RawPointer):
+  alloc_global @$s14ActorIsolation012CustomGlobalA0V6sharedAC0A4TypeCvpZ // id: %1
+  %2 = global_addr @$s14ActorIsolation012CustomGlobalA0V6sharedAC0A4TypeCvpZ : $*CustomGlobalActor.ActorType // user: %6
+  %3 = metatype $@thick CustomGlobalActor.ActorType.Type // user: %5
+  // function_ref CustomGlobalActor.ActorType.__allocating_init()
+  %4 = function_ref @$s14ActorIsolation012CustomGlobalA0V0A4TypeCAEycfC : $@convention(method) (@thick CustomGlobalActor.ActorType.Type) -> @owned CustomGlobalActor.ActorType // user: %5
+  %5 = apply %4(%3) : $@convention(method) (@thick CustomGlobalActor.ActorType.Type) -> @owned CustomGlobalActor.ActorType // user: %6
+  store %5 to %2                                  // id: %6
+  %7 = tuple ()                                   // user: %8
+  return %7                                       // id: %8
+} // end sil function '$s14ActorIsolation012CustomGlobalA0V6shared_WZ'
+
+// CustomGlobalActor.shared.unsafeMutableAddressor
+// Isolation: unspecified
+sil hidden [global_init] @$s14ActorIsolation012CustomGlobalA0V6sharedAC0A4TypeCvau : $@convention(thin) () -> Builtin.RawPointer {
+bb0:
+  %0 = global_addr @$s14ActorIsolation012CustomGlobalA0V6shared_Wz : $*Builtin.Word // user: %1
+  %1 = address_to_pointer %0 to $Builtin.RawPointer // user: %3
+  // function_ref one-time initialization function for shared
+  %2 = function_ref @$s14ActorIsolation012CustomGlobalA0V6shared_WZ : $@convention(c) (Builtin.RawPointer) -> () // user: %3
+  %3 = builtin "once"(%1, %2) : $Builtin.SILToken // user: %4
+  %4 = global_addr @$s14ActorIsolation012CustomGlobalA0V6sharedAC0A4TypeCvpZ : $*CustomGlobalActor.ActorType depends_on %3 // user: %5
+  %5 = address_to_pointer %4 to $Builtin.RawPointer // user: %6
+  return %5                                       // id: %6
+} // end sil function '$s14ActorIsolation012CustomGlobalA0V6sharedAC0A4TypeCvau'
+
+// static CustomGlobalActor.shared.getter
+// Isolation: unspecified
+sil hidden [transparent] @$s14ActorIsolation012CustomGlobalA0V6sharedAC0A4TypeCvgZ : $@convention(method) (@thin CustomGlobalActor.Type) -> @owned CustomGlobalActor.ActorType {
+// %0 "self"                                      // user: %1
+bb0(%0 : $@thin CustomGlobalActor.Type):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  // function_ref CustomGlobalActor.shared.unsafeMutableAddressor
+  %2 = function_ref @$s14ActorIsolation012CustomGlobalA0V6sharedAC0A4TypeCvau : $@convention(thin) () -> Builtin.RawPointer // user: %3
+  %3 = apply %2() : $@convention(thin) () -> Builtin.RawPointer // user: %4
+  %4 = pointer_to_address %3 to [strict] $*CustomGlobalActor.ActorType // user: %5
+  %5 = load %4                                    // users: %7, %6
+  strong_retain %5                                // id: %6
+  return %5                                       // id: %7
+} // end sil function '$s14ActorIsolation012CustomGlobalA0V6sharedAC0A4TypeCvgZ'
+
+// CustomGlobalActor.init()
+// Isolation: unspecified
+sil hidden @$s14ActorIsolation012CustomGlobalA0VACycfC : $@convention(method) (@thin CustomGlobalActor.Type) -> CustomGlobalActor {
+// %0 "$metatype"
+bb0(%0 : $@thin CustomGlobalActor.Type):
+  %1 = alloc_stack [var_decl] $CustomGlobalActor, var, name "self", type $CustomGlobalActor // users: %2, %3
+  %2 = load %1                                    // user: %4
+  dealloc_stack %1                                // id: %3
+  return %2                                       // id: %4
+} // end sil function '$s14ActorIsolation012CustomGlobalA0VACycfC'
+
+// protocol witness for static GlobalActor.shared.getter in conformance CustomGlobalActor
+// Isolation: unspecified
+sil private [transparent] [thunk] @$s14ActorIsolation012CustomGlobalA0Vs0dA0AAsADP6shared0A4TypeQzvgZTW : $@convention(witness_method: GlobalActor) (@thick CustomGlobalActor.Type) -> @owned CustomGlobalActor.ActorType {
+bb0(%0 : $@thick CustomGlobalActor.Type):
+  %1 = metatype $@thin CustomGlobalActor.Type     // user: %3
+  // function_ref static CustomGlobalActor.shared.getter
+  %2 = function_ref @$s14ActorIsolation012CustomGlobalA0V6sharedAC0A4TypeCvgZ : $@convention(method) (@thin CustomGlobalActor.Type) -> @owned CustomGlobalActor.ActorType // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@thin CustomGlobalActor.Type) -> @owned CustomGlobalActor.ActorType // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s14ActorIsolation012CustomGlobalA0Vs0dA0AAsADP6shared0A4TypeQzvgZTW'
+
+// protocol witness for static GlobalActor.sharedUnownedExecutor.getter in conformance CustomGlobalActor
+// Isolation: unspecified
+sil private [transparent] [thunk] @$s14ActorIsolation012CustomGlobalA0Vs0dA0AAsADP21sharedUnownedExecutorScevgZTW : $@convention(witness_method: GlobalActor) (@thick CustomGlobalActor.Type) -> UnownedSerialExecutor {
+// %0                                             // user: %2
+bb0(%0 : $@thick CustomGlobalActor.Type):
+  // function_ref static GlobalActor.sharedUnownedExecutor.getter
+  %1 = function_ref @$ss11GlobalActorPsE21sharedUnownedExecutorScevgZ : $@convention(method) <τ_0_0 where τ_0_0 : GlobalActor> (@thick τ_0_0.Type) -> UnownedSerialExecutor // user: %2
+  %2 = apply %1<CustomGlobalActor>(%0) : $@convention(method) <τ_0_0 where τ_0_0 : GlobalActor> (@thick τ_0_0.Type) -> UnownedSerialExecutor // user: %3
+  return %2                                       // id: %3
+} // end sil function '$s14ActorIsolation012CustomGlobalA0Vs0dA0AAsADP21sharedUnownedExecutorScevgZTW'
+
+// static GlobalActor.sharedUnownedExecutor.getter
+// Isolation: unspecified
+sil [available 12.0.0] @$ss11GlobalActorPsE21sharedUnownedExecutorScevgZ : $@convention(method) <τ_0_0 where τ_0_0 : GlobalActor> (@thick τ_0_0.Type) -> UnownedSerialExecutor
+
+// customActorFunc()
+// Isolation: global_actor. type: CustomGlobalActor
+sil hidden @$s14ActorIsolation06customA4FuncyyF : $@convention(thin) () -> () {
+bb0:
+  %0 = integer_literal $Builtin.Word, 1           // user: %2
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %1 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %2
+  %2 = apply %1<Any>(%0) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %4, %3
+  %3 = tuple_extract %2, 0                        // users: %5, %16
+  %4 = tuple_extract %2, 1                        // user: %5
+  %5 = mark_dependence %4 on %3                   // user: %6
+  %6 = pointer_to_address %5 to [strict] $*Any    // user: %13
+  %7 = string_literal utf8 "Custom global actor"  // user: %12
+  %8 = integer_literal $Builtin.Word, 19          // user: %12
+  %9 = integer_literal $Builtin.Int1, -1          // user: %12
+  %10 = metatype $@thin String.Type               // user: %12
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %11 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %12
+  %12 = apply %11(%7, %8, %9, %10) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %13 = init_existential_addr %6, $String         // user: %14
+  store %12 to %13                                // id: %14
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %15 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %16
+  %16 = apply %15<Any>(%3) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %25, %22
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %17 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %18
+  %18 = apply %17() : $@convention(thin) () -> @owned String // users: %24, %22
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %19 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %20
+  %20 = apply %19() : $@convention(thin) () -> @owned String // users: %23, %22
+  // function_ref print(_:separator:terminator:)
+  %21 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %22
+  %22 = apply %21(%16, %18, %20) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %20                               // id: %23
+  release_value %18                               // id: %24
+  release_value %16                               // id: %25
+  %26 = tuple ()                                  // user: %27
+  return %26                                      // id: %27
+} // end sil function '$s14ActorIsolation06customA4FuncyyF'
+
+// Array._endMutation()
+sil shared [_semantics "array.end_mutation"] @$sSa12_endMutationyyF : $@convention(method) <Element> (@inout Array<Element>) -> () {
+[%0: noescape! **]
+// %0                                             // users: %9, %1
+bb0(%0 : $*Array<Element>):
+  %1 = struct_element_addr %0, #Array._buffer     // user: %2
+  %2 = struct_element_addr %1, #_ArrayBuffer._storage // user: %3
+  %3 = struct_element_addr %2, #_BridgeStorage.rawValue // user: %4
+  %4 = load %3                                    // user: %5
+  %5 = end_cow_mutation %4                        // user: %6
+  %6 = struct $_BridgeStorage<__ContiguousArrayStorageBase> (%5) // user: %7
+  %7 = struct $_ArrayBuffer<Element> (%6)         // user: %8
+  %8 = struct $Array<Element> (%7)                // user: %9
+  store %8 to %0                                  // id: %9
+  %10 = tuple ()                                  // user: %11
+  return %10                                      // id: %11
+} // end sil function '$sSa12_endMutationyyF'
+
+sil_vtable MyActor {
+  #MyActor.value!getter: (isolated MyActor) -> () -> Int : @$s14ActorIsolation02MyA0C5valueSivg	// MyActor.value.getter
+  #MyActor.value!setter: (isolated MyActor) -> (Int) -> () : @$s14ActorIsolation02MyA0C5valueSivs	// MyActor.value.setter
+  #MyActor.value!modify: (isolated MyActor) -> () -> () : @$s14ActorIsolation02MyA0C5valueSivM	// MyActor.value.modify
+  #MyActor.actorMethod: (isolated MyActor) -> () -> Int : @$s14ActorIsolation02MyA0C11actorMethodSiyF	// MyActor.actorMethod()
+  #MyActor.nonisolatedMethod: (MyActor) -> () -> String : @$s14ActorIsolation02MyA0C17nonisolatedMethodSSyF	// MyActor.nonisolatedMethod()
+  #MyActor.init!allocator: (MyActor.Type) -> () -> MyActor : @$s14ActorIsolation02MyA0CACycfC	// MyActor.__allocating_init()
+  #MyActor.deinit!deallocator: @$s14ActorIsolation02MyA0CfD	// MyActor.__deallocating_deinit
+}
+
+sil_vtable ActorType {
+  #CustomGlobalActor.ActorType.init!allocator: (CustomGlobalActor.ActorType.Type) -> () -> CustomGlobalActor.ActorType : @$s14ActorIsolation012CustomGlobalA0V0A4TypeCAEycfC	// CustomGlobalActor.ActorType.__allocating_init()
+  #CustomGlobalActor.ActorType.deinit!deallocator: @$s14ActorIsolation012CustomGlobalA0V0A4TypeCfD	// CustomGlobalActor.ActorType.__deallocating_deinit
+}
+
+sil_witness_table hidden MyActor: Actor module ActorIsolation {
+  method #Actor.unownedExecutor!getter: <Self where Self : Actor> (Self) -> () -> UnownedSerialExecutor : @$s14ActorIsolation02MyA0CScAAAScA15unownedExecutorScevgTW	// protocol witness for Actor.unownedExecutor.getter in conformance MyActor
+}
+
+sil_witness_table hidden CustomGlobalActor.ActorType: Actor module ActorIsolation {
+  method #Actor.unownedExecutor!getter: <Self where Self : Actor> (Self) -> () -> UnownedSerialExecutor : @$s14ActorIsolation012CustomGlobalA0V0A4TypeCScAAAScA15unownedExecutorScevgTW	// protocol witness for Actor.unownedExecutor.getter in conformance CustomGlobalActor.ActorType
+}
+
+sil_witness_table hidden CustomGlobalActor: GlobalActor module ActorIsolation {
+  associated_conformance (ActorType: Actor): CustomGlobalActor.ActorType: Actor module ActorIsolation
+  associated_type ActorType: CustomGlobalActor.ActorType
+  method #GlobalActor.shared!getter: <Self where Self : GlobalActor> (Self.Type) -> () -> Self.ActorType : @$s14ActorIsolation012CustomGlobalA0Vs0dA0AAsADP6shared0A4TypeQzvgZTW	// protocol witness for static GlobalActor.shared.getter in conformance CustomGlobalActor
+  method #GlobalActor.sharedUnownedExecutor!getter: <Self where Self : GlobalActor> (Self.Type) -> () -> UnownedSerialExecutor : @$s14ActorIsolation012CustomGlobalA0Vs0dA0AAsADP21sharedUnownedExecutorScevgZTW	// protocol witness for static GlobalActor.sharedUnownedExecutor.getter in conformance CustomGlobalActor
+}
+
+
+
+// Mappings from '#fileID' to '#filePath':
+//   'ActorIsolation/ActorIsolation.swift' => 'ActorIsolation.swift'
+
+

@@ -1,0 +1,4 @@
+# Marp configuration for PDF/PNG export (uses default CDN KaTeX fonts)
+options:
+  emoji:
+    unicode: true

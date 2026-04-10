@@ -1,0 +1,10 @@
+{
+  "private": true,
+  "devDependencies": {
+    "@marp-team/marp-cli": "^4",
+    "@mermaid-js/mermaid-cli": "^11"
+  },
+  "overrides": {
+    "@xmldom/xmldom": ">=0.9.9"
+  }
+}

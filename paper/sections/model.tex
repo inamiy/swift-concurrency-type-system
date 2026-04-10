@@ -1,0 +1,100 @@
+\section{Formal Ingredients}
+\label{sec:model}
+
+The paper uses two semantic axes and one update discipline.
+
+\begin{itemize}
+  \item Capability answers \emph{where} the current computation runs.
+  \item Region answers \emph{where} a non-\code{Sendable} value is currently connected.
+  \item Affine environment update answers \emph{what} remains usable after evaluation.
+\end{itemize}
+
+The key claim is that Swift Concurrency becomes predictable only when these three roles are kept distinct.
+
+\subsection{Judgment and Declaration Boundaries}
+
+\begin{rulebox}{Expression judgment}
+\[
+  \Gamma;\; @\kappa;\; \alpha \vdash e : T \at \rho \dashv \Gamma'
+\]
+
+\begin{itemize}
+  \item $\Gamma$: input environment
+  \item $\Gamma'$: output environment
+  \item $@\kappa$: current execution capability
+  \item $\alpha$: ambient mode, either $\mathit{sync}$ or $\mathit{async}$
+  \item $\rho$: result region
+\end{itemize}
+
+The final component is essential because evaluation may preserve a binding, refine its region, or remove it from the caller-side environment.
+\end{rulebox}
+
+Swift function declarations are not expression terms, so the formalization also needs a declaration judgment that says how a body is checked. A declaration contributes two pieces of information to its body: the body capability~$@\kappa$ and the ambient mode~$\alpha$. For a function type annotation $@\varphi = @\sigma\; @\iota$, the body capability is obtained from $\toCapability(\mathrm{proj}_\iota(@\varphi))$, while $\alpha$ is determined by the presence or absence of \code{async}. This is where the paper introduces \code{await}-permission; it is not encoded as a separate effect system.
+
+\begin{definitionbox}{Function annotations and body capability}
+\[
+\begin{aligned}
+  @\sigma &::= \cdot \mid @\textsf{Sendable} \\
+  @\iota &::= @\kappa \mid @\textsf{isolated(any)} \mid @\textsf{concurrent} \\
+  @\varphi &::= @\sigma\; @\iota
+\end{aligned}
+\]
+
+\[
+\begin{aligned}
+  \toCapability(@\kappa) &= @\kappa \\
+  \toCapability(@\textsf{isolated(any)}) &= @\textsf{nonisolated} \\
+  \toCapability(@\textsf{concurrent}) &= @\textsf{nonisolated}
+\end{aligned}
+\]
+\end{definitionbox}
+
+This split between $@\sigma$ and $@\iota$ matters immediately. \code{@Sendable} is not an execution mode. It constrains capture. By contrast, $@\iota$ determines the body capability. Both \code{@concurrent async} and \code{nonisolated(nonsending) async} therefore type-check their bodies under $@\textsf{nonisolated}$, even though their call-site semantics differ later~\cite{se0461}.
+
+\subsection{Capability, Region, and Two Access Relations}
+
+Capability alone does not explain what remains legal after a call or an assignment. The model also needs a value-side location discipline. The region component is inspired by Tofte and Talpin's region-based memory management~\cite{tofte1997region}, while the capability component follows the static-capability tradition of Walker, Crary, and Morrisett~\cite{walker2000capabilities}. The interplay between regions and linear ownership draws on Walker and Watkins~\cite{walker2001regions}.
+
+\[
+\begin{aligned}
+  \rho_{\mathit{ns}} &::= \disconnected \mid \isolated(a) \mid \task \mid \invalid \\
+  \rho &::= \rho_{\mathit{ns}} \mid \mathunderscore
+\end{aligned}
+\]
+
+$\disconnected$ means not yet bound to an isolation domain. $\isolated(a)$ means connected to a concrete actor region. $\task$ denotes task-local non-\code{Sendable} state. $\mathunderscore$ is the normalized region tag for \code{Sendable} values. The normal form condition is therefore simple: $T : \textsf{Sendable}$ if and only if $\rho = \mathunderscore$.
+
+Two relations are then needed.
+
+\begin{itemize}
+  \item $\Accessible(@\kappa)$ determines which regions may be used directly under capability $@\kappa$.
+  \item $\Capturable(@\kappa)$ determines which regions may be closed over by a closure checked under $@\kappa$.
+\end{itemize}
+
+This distinction is one of the paper's critical refinements. Actor-isolated code may directly access task-bound values in some contexts, but an actor-isolated closure may not capture a \code{task} value because the captured state could outlive the dynamic situation that made the direct access safe. That is why nonisolated async parameters can be captured by nonisolated and \code{@isolated(any)} closures yet still be rejected by \code{@MainActor} closures after SE-0461~\cite{se0461}.
+
+\subsection{Region Merge and Capability-Region Glue}
+
+\codefile{snippets/region-binding.swift}
+
+The snippet above illustrates why region and capability cannot be merged into one notion. The value \code{x} begins disconnected. Storing it into actor-isolated state does not change its nominal type, but it does change the future facts that the type checker must remember. The environment must therefore record a refinement from $\disconnected$ to an actor-bound region.
+
+\paperfigure[0.78]{figures/region-merge-semilattice.png}{Region merge for non-\code{Sendable} values. A disconnected value can be refined into an actor or task region, while incompatible branches join to $\invalid$, which corresponds to a compile-time failure.}
+
+The operation that connects capability and region is $\toRegion(@\kappa)$. It answers a narrow but important question: if a same-isolation operation binds a value to the current execution context, which region should the value acquire? For a concrete actor capability the answer is that actor's isolated region; for $@\textsf{nonisolated}$ the answer remains $\disconnected$. This definition is what lets the formalization state same-isolation binding without conflating execution and storage.
+
+\begin{propositionbox}{Why the output environment is unavoidable}
+Region merge is not a side remark. It is the mechanism that explains why local code changes future legality. The result of an assignment or a same-isolation call is often \code{Sendable} and therefore normalized to region $\mathunderscore$, while the interesting fact survives only in the updated environment. A model without $\Gamma'$ can describe the value just produced, but it cannot describe why a later transfer becomes illegal.
+\end{propositionbox}
+
+\subsection{Transfer Is a Predicate, Not a Slogan}
+
+Swift offers both explicit and implicit transfer. Explicit transfer is written with \code{sending}. Implicit transfer occurs when a non-\code{Sendable} value crosses to a distinct isolation domain. The paper packages both cases into one predicate:
+
+\[
+  \canSend(@\kappa, @\iota, [\sending])
+\]
+
+$\canSend$ holds either because the parameter is explicitly marked \code{sending}, or because the callee isolation $@\iota$ is distinct from the caller capability $@\kappa$ and therefore induces an implicit cross-isolation transfer. This is another place where surface syntax hides a deeper commonality: the important fact is not merely whether the keyword \code{sending} appears, but whether the call site transfers responsibility for the value.
+
+This viewpoint also clarifies the asymmetry between parameters and results. Parameters can be consumed from the caller by shrinking the environment. Results travel in the opposite direction. A cross-isolation non-\code{Sendable} result is therefore legal only if the callee explicitly promises a disconnected \code{sending} result. The next two sections show how these auxiliary definitions govern conversion, calls, closure inference, and dynamic isolation.

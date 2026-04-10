@@ -1,0 +1,44 @@
+\section{Conversion Is Not One Partial Order}
+\label{sec:conversion}
+
+Function conversion is where informal explanations of Swift Concurrency most often collapse. It is tempting to ask whether one isolated function type is a subtype of another and stop there. The experimental conversion corpus shows that this is too simple. The formalization needs three distinct notions.
+
+\begin{itemize}
+  \item semantic subtyping, which may compose transitively,
+  \item one-step contextual coercion, which represents the direct edges the compiler accepts without rebuilding the function value,
+  \item and explicit closure wrapping, where a new function is constructed to mediate between source and target.
+\end{itemize}
+
+\begin{definitionbox}{Why the distinction matters}
+Some successful local conversions are genuine subtype or direct coercion edges. Others succeed only because the programmer writes a fresh closure such as \code{\{ await f(\$0) \}} or because contextual typing synthesizes an equivalent wrapper. Treating these cases as one relation hides the structure that the compiler actually implements.
+\end{definitionbox}
+
+The conversion graphs therefore do not describe a single flat lattice. They describe several interacting families: sync conversion, async conversion, dynamic-isolation conversion around \code{@isolated(any)}, and actor-parameter branches that cannot be erased by direct coercion.
+
+\paperfigure[0.92]{figures/func-conversion-sync.png}{Selected sync conversion behavior. The graph contains genuine subtype and coercion edges, but not every useful sync-to-sync change is represented. In particular, actor-parameter branches and deprecated \code{@isolated(any)} erasure sit outside a simple monotone order.}
+
+\paperfigure[0.92]{figures/func-conversion-async.png}{Selected async conversion behavior. Async introduces a richer direct-coercion space: non-\code{Sendable} \code{@nonisolated}, \code{@concurrent}, and \code{@isolated(any)} form one practical cluster, while \code{@Sendable} variants form another. Actor-parameter branches remain a separate sink that usually requires closure wrapping.}
+
+Three observations matter most for the rest of the paper.
+
+\subsection{Sync and Async Have Different Structural Freedom}
+
+In the sync world, unrelated actor-isolated functions are not interchangeable because there is no suspension point that could bridge the actor boundary. Sync conversion therefore stays narrow. By contrast, async function values admit a broader coercion space because an async call can incorporate suspension and actor hopping when required. This is why \code{@MainActor async} behaves far more flexibly than \code{@MainActor sync}, and why the async graph contains genuinely bidirectional clusters that do not exist in sync form~\cite{se0431,se0461}.
+
+\subsection{\code{@concurrent} and \code{@nonisolated async} Are Not Identical}
+
+Both \code{@concurrent async} and \code{@nonisolated async} bodies type-check under $@\textsf{nonisolated}$, but they represent different operational stories. \code{@nonisolated async} after SE-0461 inherits caller execution, whereas \code{@concurrent} is explicitly actor-independent and performs stricter sendability checking at actor-capable call sites~\cite{se0461}. The conversion graphs partly overlap because both inhabit the non-actor-isolated async world, but their call rules diverge later.
+
+\subsection{\code{@isolated(any)} Is a Dynamic Interface, Not a Static Actor Label}
+
+\code{@isolated(any)} does not merely mean ``some actor annotation I do not care about.'' It packages actor identity dynamically. That is why a sync-looking \code{@isolated(any)} value may still require \code{await}, and why actor identity can be preserved or erased depending on the conversion path that produced the value~\cite{se0431}.
+
+\codefile{snippets/isolated-any-await.swift}
+
+The example above is not a corner case. It expresses the central lesson of dynamic isolation: a value of type \code{@isolated(any) () -> Void} carries enough runtime information to require cross-isolation calling conventions, even when no static actor name appears at the call site.
+
+\begin{propositionbox}{The actor-parameter branch is a sink, not a peer}
+Function types with an \code{isolated} actor parameter are structurally different from zero-argument actor-isolated functions. They carry a concrete actor witness as part of the function value's calling convention. Direct coercion may forget \code{@Sendable}, but it cannot erase that actor parameter. Reaching or leaving this branch generally requires explicit closure wrapping rather than ordinary subtype reasoning.
+\end{propositionbox}
+
+The conversion section therefore sets up the remainder of the paper in two ways. First, it explains why the call rules must distinguish same-isolation, cross-isolation, \code{@concurrent}, and dynamic-isolation cases instead of relying on one generic ``isolated function'' intuition. Second, it explains why validation must check both direct coercion edges and identity-erasing construction paths. The next section isolates the rules that perform that work.

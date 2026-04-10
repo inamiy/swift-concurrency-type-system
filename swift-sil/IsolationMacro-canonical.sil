@@ -1,0 +1,704 @@
+sil_stage canonical
+
+import Builtin
+import Swift
+import SwiftShims
+
+func withDefaultIsolation<T>(_ body: () throws -> T, isolation: isolated (any Actor)? = #isolation) rethrows -> T
+
+func withExplicitIsolation<T>(_ body: () throws -> T, isolation: isolated (any Actor)?) rethrows -> T
+
+@MainActor func callerMainActor()
+
+actor MyActor {
+  func callerFromActor()
+  @objc deinit
+  init()
+  @available(iOS 13.0, tvOS 13.0, watchOS 6.0, macOS 10.15, *)
+  @_semantics("defaultActor") nonisolated final var unownedExecutor: UnownedSerialExecutor {
+    get
+  }
+}
+
+nonisolated func callerNonisolated()
+
+// main
+// Isolation: unspecified
+sil @main : $@convention(c) (Int32, UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>) -> Int32 {
+bb0(%0 : $Int32, %1 : $UnsafeMutablePointer<Optional<UnsafeMutablePointer<Int8>>>):
+  %2 = integer_literal $Builtin.Int32, 0          // user: %3
+  %3 = struct $Int32 (%2)                         // user: %4
+  return %3                                       // id: %4
+} // end sil function 'main'
+
+// withDefaultIsolation<A>(_:isolation:)
+// Isolation: actor_instance. name: 'isolation'
+sil hidden @$s14IsolationMacro011withDefaultA0_9isolationxxyKXE_ScA_pSgYitKlF : $@convention(thin) <T> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out T, @error any Error) {
+// %0 "$return_value"                             // user: %6
+// %1 "body"                                      // users: %6, %3
+// %2 "isolation"                                 // user: %4
+bb0(%0 : $*T, %1 : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>, %2 : $Optional<any Actor>):
+  debug_value %1, let, name "body", argno 1       // id: %3
+  debug_value %2, let, name "isolation", argno 2  // id: %4
+  debug_value undef : $any Error, var, name "$error", argno 3 // id: %5
+  try_apply %1(%0) : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>, normal bb1, error bb2 // id: %6
+
+bb1(%7 : $()):                                    // Preds: bb0
+  %8 = tuple ()                                   // user: %9
+  return %8                                       // id: %9
+
+// %10                                            // user: %11
+bb2(%10 : $any Error):                            // Preds: bb0
+  throw %10                                       // id: %11
+} // end sil function '$s14IsolationMacro011withDefaultA0_9isolationxxyKXE_ScA_pSgYitKlF'
+
+// withExplicitIsolation<A>(_:isolation:)
+// Isolation: actor_instance. name: 'isolation'
+sil hidden @$s14IsolationMacro012withExplicitA0_9isolationxxyKXE_ScA_pSgYitKlF : $@convention(thin) <T> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out T, @error any Error) {
+// %0 "$return_value"                             // user: %6
+// %1 "body"                                      // users: %6, %3
+// %2 "isolation"                                 // user: %4
+bb0(%0 : $*T, %1 : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>, %2 : $Optional<any Actor>):
+  debug_value %1, let, name "body", argno 1       // id: %3
+  debug_value %2, let, name "isolation", argno 2  // id: %4
+  debug_value undef : $any Error, var, name "$error", argno 3 // id: %5
+  try_apply %1(%0) : $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <T>, normal bb1, error bb2 // id: %6
+
+bb1(%7 : $()):                                    // Preds: bb0
+  %8 = tuple ()                                   // user: %9
+  return %8                                       // id: %9
+
+// %10                                            // user: %11
+bb2(%10 : $any Error):                            // Preds: bb0
+  throw %10                                       // id: %11
+} // end sil function '$s14IsolationMacro012withExplicitA0_9isolationxxyKXE_ScA_pSgYitKlF'
+
+// callerMainActor()
+// Isolation: global_actor. type: MainActor
+sil hidden @$s14IsolationMacro15callerMainActoryyF : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $()                            // users: %12, %9
+  // function_ref closure #1 in callerMainActor()
+  %1 = function_ref @$s14IsolationMacro15callerMainActoryyFyyXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %2
+  %2 = thin_to_thick_function %1 to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %9
+  %3 = metatype $@thick MainActor.Type            // user: %5
+  // function_ref static MainActor.shared.getter
+  %4 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %5
+  %5 = apply %4(%3) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %6
+  %6 = init_existential_ref %5 : $MainActor : $MainActor, $any Actor // user: %7
+  %7 = enum $Optional<any Actor>, #Optional.some!enumelt, %6 // users: %11, %9
+  // function_ref withDefaultIsolation<A>(_:isolation:)
+  %8 = function_ref @$s14IsolationMacro011withDefaultA0_9isolationxxyKXE_ScA_pSgYitKlF : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error) // user: %9
+  try_apply %8<()>(%0, %2, %7) : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error), normal bb1, error bb4 // id: %9
+
+bb1(%10 : $()):                                   // Preds: bb0
+  release_value %7                                // id: %11
+  dealloc_stack %0                                // id: %12
+  %13 = alloc_stack $()                           // users: %25, %22
+  // function_ref closure #2 in callerMainActor()
+  %14 = function_ref @$s14IsolationMacro15callerMainActoryyFyyXEfU0_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %15
+  %15 = thin_to_thick_function %14 to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %22
+  %16 = metatype $@thick MainActor.Type           // user: %18
+  // function_ref static MainActor.shared.getter
+  %17 = function_ref @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %18
+  %18 = apply %17(%16) : $@convention(method) (@thick MainActor.Type) -> @owned MainActor // user: %19
+  %19 = init_existential_ref %18 : $MainActor : $MainActor, $any Actor // user: %20
+  %20 = enum $Optional<any Actor>, #Optional.some!enumelt, %19 // users: %24, %22
+  // function_ref withExplicitIsolation<A>(_:isolation:)
+  %21 = function_ref @$s14IsolationMacro012withExplicitA0_9isolationxxyKXE_ScA_pSgYitKlF : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error) // user: %22
+  try_apply %21<()>(%13, %15, %20) : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error), normal bb2, error bb5 // id: %22
+
+bb2(%23 : $()):                                   // Preds: bb1
+  release_value %20                               // id: %24
+  dealloc_stack %13                               // id: %25
+  %26 = alloc_stack $()                           // users: %33, %31
+  // function_ref closure #3 in callerMainActor()
+  %27 = function_ref @$s14IsolationMacro15callerMainActoryyFyyXEfU1_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %28
+  %28 = thin_to_thick_function %27 to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %31
+  %29 = enum $Optional<any Actor>, #Optional.none!enumelt // user: %31
+  // function_ref withDefaultIsolation<A>(_:isolation:)
+  %30 = function_ref @$s14IsolationMacro011withDefaultA0_9isolationxxyKXE_ScA_pSgYitKlF : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error) // user: %31
+  try_apply %30<()>(%26, %28, %29) : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error), normal bb3, error bb6 // id: %31
+
+bb3(%32 : $()):                                   // Preds: bb2
+  dealloc_stack %26                               // id: %33
+  %34 = tuple ()                                  // user: %35
+  return %34                                      // id: %35
+
+bb4(%36 : $any Error):                            // Preds: bb0
+  unreachable                                     // id: %37
+
+bb5(%38 : $any Error):                            // Preds: bb1
+  unreachable                                     // id: %39
+
+bb6(%40 : $any Error):                            // Preds: bb2
+  unreachable                                     // id: %41
+} // end sil function '$s14IsolationMacro15callerMainActoryyF'
+
+// closure #1 in callerMainActor()
+// Isolation: global_actor. type: MainActor
+sil private @$s14IsolationMacro15callerMainActoryyFyyXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> {
+// %0 "$return_value"
+bb0(%0 : $*()):
+  debug_value undef : $any Error, var, name "$error", argno 1 // id: %1
+  %2 = integer_literal $Builtin.Word, 1           // user: %4
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %3 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %4
+  %4 = apply %3<Any>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %6, %5
+  %5 = tuple_extract %4, 0                        // users: %7, %18
+  %6 = tuple_extract %4, 1                        // user: %7
+  %7 = mark_dependence %6 on %5                   // user: %8
+  %8 = pointer_to_address %7 to [strict] $*Any    // user: %15
+  %9 = string_literal utf8 "default isolation"    // user: %14
+  %10 = integer_literal $Builtin.Word, 17         // user: %14
+  %11 = integer_literal $Builtin.Int1, -1         // user: %14
+  %12 = metatype $@thin String.Type               // user: %14
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %13 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %16
+  %15 = init_existential_addr %8, $String         // user: %16
+  store %14 to %15                                // id: %16
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %17 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %18
+  %18 = apply %17<Any>(%5) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %27, %24
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %19 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %20
+  %20 = apply %19() : $@convention(thin) () -> @owned String // users: %26, %24
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %21 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %22
+  %22 = apply %21() : $@convention(thin) () -> @owned String // users: %25, %24
+  // function_ref print(_:separator:terminator:)
+  %23 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %24
+  %24 = apply %23(%18, %20, %22) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %22                               // id: %25
+  release_value %20                               // id: %26
+  release_value %18                               // id: %27
+  %28 = tuple ()                                  // user: %29
+  return %28                                      // id: %29
+} // end sil function '$s14IsolationMacro15callerMainActoryyFyyXEfU_'
+
+// _allocateUninitializedArray<A>(_:)
+// Isolation: unspecified
+sil [always_inline] [_semantics "array.uninitialized_intrinsic"] @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <Element> (Builtin.Word) -> (@owned Array<Element>, Builtin.RawPointer)
+
+// String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+// Isolation: unspecified
+sil [always_inline] [readonly] [_semantics "string.makeUTF8"] @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String
+
+// _finalizeUninitializedArray<A>(_:)
+// Isolation: unspecified
+sil shared [readnone] [_semantics "array.finalize_intrinsic"] @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <Element> (@owned Array<Element>) -> @owned Array<Element> {
+[%0: escape! v** => %r.v**, escape! v**.c*.v** => %r.v**.c*.v**]
+// %0                                             // user: %2
+bb0(%0 : $Array<Element>):
+  %1 = alloc_stack [var_decl] $Array<Element>     // users: %5, %2, %6, %4
+  store %0 to %1                                  // id: %2
+  // function_ref Array._endMutation()
+  %3 = function_ref @$sSa12_endMutationyyF : $@convention(method) <τ_0_0> (@inout Array<τ_0_0>) -> () // user: %4
+  %4 = apply %3<Element>(%1) : $@convention(method) <τ_0_0> (@inout Array<τ_0_0>) -> ()
+  %5 = load %1                                    // user: %7
+  dealloc_stack %1                                // id: %6
+  return %5                                       // id: %7
+} // end sil function '$ss27_finalizeUninitializedArrayySayxGABnlF'
+
+// default argument 1 of print(_:separator:terminator:)
+// Isolation: unspecified
+sil shared @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String {
+bb0:
+  %0 = string_literal utf8 " "                    // user: %5
+  %1 = integer_literal $Builtin.Word, 1           // user: %5
+  %2 = integer_literal $Builtin.Int1, -1          // user: %5
+  %3 = metatype $@thin String.Type                // user: %5
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %5
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %6
+  return %5                                       // id: %6
+} // end sil function '$ss5print_9separator10terminatoryypd_S2StFfA0_'
+
+// default argument 2 of print(_:separator:terminator:)
+// Isolation: unspecified
+sil shared @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String {
+bb0:
+  %0 = string_literal utf8 "\n"                   // user: %5
+  %1 = integer_literal $Builtin.Word, 1           // user: %5
+  %2 = integer_literal $Builtin.Int1, -1          // user: %5
+  %3 = metatype $@thin String.Type                // user: %5
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %4 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %5
+  %5 = apply %4(%0, %1, %2, %3) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %6
+  return %5                                       // id: %6
+} // end sil function '$ss5print_9separator10terminatoryypd_S2StFfA1_'
+
+// print(_:separator:terminator:)
+// Isolation: unspecified
+sil @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+
+// static MainActor.shared.getter
+// Isolation: unspecified
+sil [available 12.0.0] @$sScM6sharedScMvgZ : $@convention(method) (@thick MainActor.Type) -> @owned MainActor
+
+// freestanding macro expansion #2 of isolation in module IsolationMacro file IsolationMacro.swift line 27 column 26
+sil @$s14IsolationMacro0025IsolationMacroswift_jqFBgfMX26_25_9isolationfMf0_ : $@convention(thin) () -> ()
+
+// __unknown_macro__
+sil @__unknown_macro__ : $@convention(thin) () -> ()
+
+// closure #2 in callerMainActor()
+// Isolation: global_actor. type: MainActor
+sil private @$s14IsolationMacro15callerMainActoryyFyyXEfU0_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> {
+// %0 "$return_value"
+bb0(%0 : $*()):
+  debug_value undef : $any Error, var, name "$error", argno 1 // id: %1
+  %2 = integer_literal $Builtin.Word, 1           // user: %4
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %3 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %4
+  %4 = apply %3<Any>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %6, %5
+  %5 = tuple_extract %4, 0                        // users: %7, %18
+  %6 = tuple_extract %4, 1                        // user: %7
+  %7 = mark_dependence %6 on %5                   // user: %8
+  %8 = pointer_to_address %7 to [strict] $*Any    // user: %15
+  %9 = string_literal utf8 "explicit isolation"   // user: %14
+  %10 = integer_literal $Builtin.Word, 18         // user: %14
+  %11 = integer_literal $Builtin.Int1, -1         // user: %14
+  %12 = metatype $@thin String.Type               // user: %14
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %13 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %16
+  %15 = init_existential_addr %8, $String         // user: %16
+  store %14 to %15                                // id: %16
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %17 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %18
+  %18 = apply %17<Any>(%5) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %27, %24
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %19 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %20
+  %20 = apply %19() : $@convention(thin) () -> @owned String // users: %26, %24
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %21 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %22
+  %22 = apply %21() : $@convention(thin) () -> @owned String // users: %25, %24
+  // function_ref print(_:separator:terminator:)
+  %23 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %24
+  %24 = apply %23(%18, %20, %22) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %22                               // id: %25
+  release_value %20                               // id: %26
+  release_value %18                               // id: %27
+  %28 = tuple ()                                  // user: %29
+  return %28                                      // id: %29
+} // end sil function '$s14IsolationMacro15callerMainActoryyFyyXEfU0_'
+
+// freestanding macro expansion #1 of isolation in module IsolationMacro file IsolationMacro.swift line 34 column 19
+sil @$s14IsolationMacro0025IsolationMacroswift_jqFBgfMX33_18_9isolationfMf_ : $@convention(thin) () -> ()
+
+// closure #3 in callerMainActor()
+// Isolation: global_actor. type: MainActor
+sil private @$s14IsolationMacro15callerMainActoryyFyyXEfU1_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> {
+// %0 "$return_value"
+bb0(%0 : $*()):
+  debug_value undef : $any Error, var, name "$error", argno 1 // id: %1
+  %2 = integer_literal $Builtin.Word, 1           // user: %4
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %3 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %4
+  %4 = apply %3<Any>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %6, %5
+  %5 = tuple_extract %4, 0                        // users: %7, %18
+  %6 = tuple_extract %4, 1                        // user: %7
+  %7 = mark_dependence %6 on %5                   // user: %8
+  %8 = pointer_to_address %7 to [strict] $*Any    // user: %15
+  %9 = string_literal utf8 "nil isolation"        // user: %14
+  %10 = integer_literal $Builtin.Word, 13         // user: %14
+  %11 = integer_literal $Builtin.Int1, -1         // user: %14
+  %12 = metatype $@thin String.Type               // user: %14
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %13 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %16
+  %15 = init_existential_addr %8, $String         // user: %16
+  store %14 to %15                                // id: %16
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %17 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %18
+  %18 = apply %17<Any>(%5) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %27, %24
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %19 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %20
+  %20 = apply %19() : $@convention(thin) () -> @owned String // users: %26, %24
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %21 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %22
+  %22 = apply %21() : $@convention(thin) () -> @owned String // users: %25, %24
+  // function_ref print(_:separator:terminator:)
+  %23 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %24
+  %24 = apply %23(%18, %20, %22) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %22                               // id: %25
+  release_value %20                               // id: %26
+  release_value %18                               // id: %27
+  %28 = tuple ()                                  // user: %29
+  return %28                                      // id: %29
+} // end sil function '$s14IsolationMacro15callerMainActoryyFyyXEfU1_'
+
+// MyActor.callerFromActor()
+// Isolation: actor_instance. name: 'self'
+sil hidden @$s14IsolationMacro7MyActorC010callerFromD0yyF : $@convention(method) (@sil_isolated @guaranteed MyActor) -> () {
+// %0 "self"                                      // users: %17, %16, %6, %5, %1
+bb0(%0 : $MyActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = alloc_stack $()                            // users: %12, %9
+  // function_ref closure #1 in MyActor.callerFromActor()
+  %3 = function_ref @$s14IsolationMacro7MyActorC010callerFromD0yyFyyXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %4
+  %4 = thin_to_thick_function %3 to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %9
+  strong_retain %0                                // id: %5
+  %6 = init_existential_ref %0 : $MyActor : $MyActor, $any Actor // user: %7
+  %7 = enum $Optional<any Actor>, #Optional.some!enumelt, %6 // users: %11, %9
+  // function_ref withDefaultIsolation<A>(_:isolation:)
+  %8 = function_ref @$s14IsolationMacro011withDefaultA0_9isolationxxyKXE_ScA_pSgYitKlF : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error) // user: %9
+  try_apply %8<()>(%2, %4, %7) : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error), normal bb1, error bb3 // id: %9
+
+bb1(%10 : $()):                                   // Preds: bb0
+  release_value %7                                // id: %11
+  dealloc_stack %2                                // id: %12
+  %13 = alloc_stack $()                           // users: %23, %20
+  // function_ref closure #2 in MyActor.callerFromActor()
+  %14 = function_ref @$s14IsolationMacro7MyActorC010callerFromD0yyFyyXEfU0_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %15
+  %15 = thin_to_thick_function %14 to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %20
+  strong_retain %0                                // id: %16
+  %17 = init_existential_ref %0 : $MyActor : $MyActor, $any Actor // user: %18
+  %18 = enum $Optional<any Actor>, #Optional.some!enumelt, %17 // users: %22, %20
+  // function_ref withExplicitIsolation<A>(_:isolation:)
+  %19 = function_ref @$s14IsolationMacro012withExplicitA0_9isolationxxyKXE_ScA_pSgYitKlF : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error) // user: %20
+  try_apply %19<()>(%13, %15, %18) : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error), normal bb2, error bb4 // id: %20
+
+bb2(%21 : $()):                                   // Preds: bb1
+  release_value %18                               // id: %22
+  dealloc_stack %13                               // id: %23
+  %24 = tuple ()                                  // user: %25
+  return %24                                      // id: %25
+
+bb3(%26 : $any Error):                            // Preds: bb0
+  unreachable                                     // id: %27
+
+bb4(%28 : $any Error):                            // Preds: bb1
+  unreachable                                     // id: %29
+} // end sil function '$s14IsolationMacro7MyActorC010callerFromD0yyF'
+
+// closure #1 in MyActor.callerFromActor()
+// Isolation: nonisolated
+sil private @$s14IsolationMacro7MyActorC010callerFromD0yyFyyXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> {
+// %0 "$return_value"
+bb0(%0 : $*()):
+  debug_value undef : $any Error, var, name "$error", argno 1 // id: %1
+  %2 = integer_literal $Builtin.Word, 1           // user: %4
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %3 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %4
+  %4 = apply %3<Any>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %6, %5
+  %5 = tuple_extract %4, 0                        // users: %7, %18
+  %6 = tuple_extract %4, 1                        // user: %7
+  %7 = mark_dependence %6 on %5                   // user: %8
+  %8 = pointer_to_address %7 to [strict] $*Any    // user: %15
+  %9 = string_literal utf8 "actor default"        // user: %14
+  %10 = integer_literal $Builtin.Word, 13         // user: %14
+  %11 = integer_literal $Builtin.Int1, -1         // user: %14
+  %12 = metatype $@thin String.Type               // user: %14
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %13 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %16
+  %15 = init_existential_addr %8, $String         // user: %16
+  store %14 to %15                                // id: %16
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %17 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %18
+  %18 = apply %17<Any>(%5) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %27, %24
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %19 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %20
+  %20 = apply %19() : $@convention(thin) () -> @owned String // users: %26, %24
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %21 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %22
+  %22 = apply %21() : $@convention(thin) () -> @owned String // users: %25, %24
+  // function_ref print(_:separator:terminator:)
+  %23 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %24
+  %24 = apply %23(%18, %20, %22) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %22                               // id: %25
+  release_value %20                               // id: %26
+  release_value %18                               // id: %27
+  %28 = tuple ()                                  // user: %29
+  return %28                                      // id: %29
+} // end sil function '$s14IsolationMacro7MyActorC010callerFromD0yyFyyXEfU_'
+
+// freestanding macro expansion #2 of isolation in module IsolationMacro file IsolationMacro.swift line 45 column 30
+sil @$s14IsolationMacro0025IsolationMacroswift_jqFBgfMX44_29_9isolationfMf0_ : $@convention(thin) () -> ()
+
+// closure #2 in MyActor.callerFromActor()
+// Isolation: nonisolated
+sil private @$s14IsolationMacro7MyActorC010callerFromD0yyFyyXEfU0_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> {
+// %0 "$return_value"
+bb0(%0 : $*()):
+  debug_value undef : $any Error, var, name "$error", argno 1 // id: %1
+  %2 = integer_literal $Builtin.Word, 1           // user: %4
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %3 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %4
+  %4 = apply %3<Any>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %6, %5
+  %5 = tuple_extract %4, 0                        // users: %7, %18
+  %6 = tuple_extract %4, 1                        // user: %7
+  %7 = mark_dependence %6 on %5                   // user: %8
+  %8 = pointer_to_address %7 to [strict] $*Any    // user: %15
+  %9 = string_literal utf8 "actor explicit"       // user: %14
+  %10 = integer_literal $Builtin.Word, 14         // user: %14
+  %11 = integer_literal $Builtin.Int1, -1         // user: %14
+  %12 = metatype $@thin String.Type               // user: %14
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %13 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %16
+  %15 = init_existential_addr %8, $String         // user: %16
+  store %14 to %15                                // id: %16
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %17 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %18
+  %18 = apply %17<Any>(%5) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %27, %24
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %19 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %20
+  %20 = apply %19() : $@convention(thin) () -> @owned String // users: %26, %24
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %21 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %22
+  %22 = apply %21() : $@convention(thin) () -> @owned String // users: %25, %24
+  // function_ref print(_:separator:terminator:)
+  %23 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %24
+  %24 = apply %23(%18, %20, %22) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %22                               // id: %25
+  release_value %20                               // id: %26
+  release_value %18                               // id: %27
+  %28 = tuple ()                                  // user: %29
+  return %28                                      // id: %29
+} // end sil function '$s14IsolationMacro7MyActorC010callerFromD0yyFyyXEfU0_'
+
+// freestanding macro expansion #1 of isolation in module IsolationMacro file IsolationMacro.swift line 52 column 23
+sil @$s14IsolationMacro0025IsolationMacroswift_jqFBgfMX51_22_9isolationfMf_ : $@convention(thin) () -> ()
+
+// MyActor.deinit
+// Isolation: unspecified
+sil hidden @$s14IsolationMacro7MyActorCfd : $@convention(method) (@guaranteed MyActor) -> @owned Builtin.NativeObject {
+// %0 "self"                                      // users: %3, %2, %1
+bb0(%0 : $MyActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = builtin "destroyDefaultActor"(%0) : $()
+  %3 = unchecked_ref_cast %0 to $Builtin.NativeObject // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s14IsolationMacro7MyActorCfd'
+
+// MyActor.__deallocating_deinit
+// Isolation: nonisolated
+sil hidden @$s14IsolationMacro7MyActorCfD : $@convention(method) (@owned MyActor) -> () {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $MyActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  // function_ref MyActor.deinit
+  %2 = function_ref @$s14IsolationMacro7MyActorCfd : $@convention(method) (@guaranteed MyActor) -> @owned Builtin.NativeObject // user: %3
+  %3 = apply %2(%0) : $@convention(method) (@guaranteed MyActor) -> @owned Builtin.NativeObject // user: %4
+  %4 = unchecked_ref_cast %3 to $MyActor          // user: %5
+  dealloc_ref %4                                  // id: %5
+  %6 = tuple ()                                   // user: %7
+  return %6                                       // id: %7
+} // end sil function '$s14IsolationMacro7MyActorCfD'
+
+// MyActor.__allocating_init()
+// Isolation: nonisolated
+sil hidden [exact_self_class] @$s14IsolationMacro7MyActorCACycfC : $@convention(method) (@thick MyActor.Type) -> @owned MyActor {
+// %0 "$metatype"
+bb0(%0 : $@thick MyActor.Type):
+  %1 = alloc_ref $MyActor                         // user: %3
+  // function_ref MyActor.init()
+  %2 = function_ref @$s14IsolationMacro7MyActorCACycfc : $@convention(method) (@owned MyActor) -> @owned MyActor // user: %3
+  %3 = apply %2(%1) : $@convention(method) (@owned MyActor) -> @owned MyActor // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s14IsolationMacro7MyActorCACycfC'
+
+// MyActor.init()
+// Isolation: nonisolated
+sil hidden @$s14IsolationMacro7MyActorCACycfc : $@convention(method) (@owned MyActor) -> @owned MyActor {
+// %0 "self"                                      // users: %3, %2, %1
+bb0(%0 : $MyActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = builtin "initializeDefaultActor"(%0) : $()
+  %3 = end_init_let_ref %0                        // user: %4
+  return %3                                       // id: %4
+} // end sil function '$s14IsolationMacro7MyActorCACycfc'
+
+// MyActor.unownedExecutor.getter
+// Isolation: nonisolated
+sil hidden [available 10.15] [_semantics "defaultActor"] @$s14IsolationMacro7MyActorC15unownedExecutorScevg : $@convention(method) (@guaranteed MyActor) -> UnownedSerialExecutor {
+// %0 "self"                                      // users: %3, %1
+bb0(%0 : $MyActor):
+  debug_value %0, let, name "self", argno 1       // id: %1
+  %2 = metatype $@thin UnownedSerialExecutor.Type // user: %5
+  %3 = builtin "buildDefaultActorExecutorRef"<MyActor>(%0) : $Builtin.Executor // user: %5
+  // function_ref UnownedSerialExecutor.init(_:)
+  %4 = function_ref @$sSceySceBecfC : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor // user: %5
+  %5 = apply %4(%3, %2) : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor // user: %6
+  return %5                                       // id: %6
+} // end sil function '$s14IsolationMacro7MyActorC15unownedExecutorScevg'
+
+// UnownedSerialExecutor.init(_:)
+// Isolation: unspecified
+sil [available 12.0.0] @$sSceySceBecfC : $@convention(method) (Builtin.Executor, @thin UnownedSerialExecutor.Type) -> UnownedSerialExecutor
+
+// protocol witness for Actor.unownedExecutor.getter in conformance MyActor
+// Isolation: nonisolated
+sil private [transparent] [thunk] @$s14IsolationMacro7MyActorCScAAAScA15unownedExecutorScevgTW : $@convention(witness_method: Actor) (@guaranteed MyActor) -> UnownedSerialExecutor {
+// %0                                             // user: %2
+bb0(%0 : $MyActor):
+  // function_ref MyActor.unownedExecutor.getter
+  %1 = function_ref @$s14IsolationMacro7MyActorC15unownedExecutorScevg : $@convention(method) (@guaranteed MyActor) -> UnownedSerialExecutor // user: %2
+  %2 = apply %1(%0) : $@convention(method) (@guaranteed MyActor) -> UnownedSerialExecutor // user: %3
+  return %2                                       // id: %3
+} // end sil function '$s14IsolationMacro7MyActorCScAAAScA15unownedExecutorScevgTW'
+
+// callerNonisolated()
+// Isolation: nonisolated
+sil hidden @$s14IsolationMacro17callerNonisolatedyyF : $@convention(thin) () -> () {
+bb0:
+  %0 = alloc_stack $()                            // users: %7, %5
+  // function_ref closure #1 in callerNonisolated()
+  %1 = function_ref @$s14IsolationMacro17callerNonisolatedyyFyyXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %2
+  %2 = thin_to_thick_function %1 to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %5
+  %3 = enum $Optional<any Actor>, #Optional.none!enumelt // user: %5
+  // function_ref withDefaultIsolation<A>(_:isolation:)
+  %4 = function_ref @$s14IsolationMacro011withDefaultA0_9isolationxxyKXE_ScA_pSgYitKlF : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error) // user: %5
+  try_apply %4<()>(%0, %2, %3) : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error), normal bb1, error bb3 // id: %5
+
+bb1(%6 : $()):                                    // Preds: bb0
+  dealloc_stack %0                                // id: %7
+  %8 = alloc_stack $()                            // users: %15, %13
+  // function_ref closure #2 in callerNonisolated()
+  %9 = function_ref @$s14IsolationMacro17callerNonisolatedyyFyyXEfU0_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %10
+  %10 = thin_to_thick_function %9 to $@noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> // user: %13
+  %11 = enum $Optional<any Actor>, #Optional.none!enumelt // user: %13
+  // function_ref withExplicitIsolation<A>(_:isolation:)
+  %12 = function_ref @$s14IsolationMacro012withExplicitA0_9isolationxxyKXE_ScA_pSgYitKlF : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error) // user: %13
+  try_apply %12<()>(%8, %10, %11) : $@convention(thin) <τ_0_0> (@guaranteed @noescape @callee_guaranteed @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <τ_0_0>, @sil_isolated @guaranteed Optional<any Actor>) -> (@out τ_0_0, @error any Error), normal bb2, error bb4 // id: %13
+
+bb2(%14 : $()):                                   // Preds: bb1
+  dealloc_stack %8                                // id: %15
+  %16 = tuple ()                                  // user: %17
+  return %16                                      // id: %17
+
+bb3(%18 : $any Error):                            // Preds: bb0
+  unreachable                                     // id: %19
+
+bb4(%20 : $any Error):                            // Preds: bb1
+  unreachable                                     // id: %21
+} // end sil function '$s14IsolationMacro17callerNonisolatedyyF'
+
+// closure #1 in callerNonisolated()
+// Isolation: nonisolated
+sil private @$s14IsolationMacro17callerNonisolatedyyFyyXEfU_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> {
+// %0 "$return_value"
+bb0(%0 : $*()):
+  debug_value undef : $any Error, var, name "$error", argno 1 // id: %1
+  %2 = integer_literal $Builtin.Word, 1           // user: %4
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %3 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %4
+  %4 = apply %3<Any>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %6, %5
+  %5 = tuple_extract %4, 0                        // users: %7, %18
+  %6 = tuple_extract %4, 1                        // user: %7
+  %7 = mark_dependence %6 on %5                   // user: %8
+  %8 = pointer_to_address %7 to [strict] $*Any    // user: %15
+  %9 = string_literal utf8 "nonisolated default"  // user: %14
+  %10 = integer_literal $Builtin.Word, 19         // user: %14
+  %11 = integer_literal $Builtin.Int1, -1         // user: %14
+  %12 = metatype $@thin String.Type               // user: %14
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %13 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %16
+  %15 = init_existential_addr %8, $String         // user: %16
+  store %14 to %15                                // id: %16
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %17 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %18
+  %18 = apply %17<Any>(%5) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %27, %24
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %19 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %20
+  %20 = apply %19() : $@convention(thin) () -> @owned String // users: %26, %24
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %21 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %22
+  %22 = apply %21() : $@convention(thin) () -> @owned String // users: %25, %24
+  // function_ref print(_:separator:terminator:)
+  %23 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %24
+  %24 = apply %23(%18, %20, %22) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %22                               // id: %25
+  release_value %20                               // id: %26
+  release_value %18                               // id: %27
+  %28 = tuple ()                                  // user: %29
+  return %28                                      // id: %29
+} // end sil function '$s14IsolationMacro17callerNonisolatedyyFyyXEfU_'
+
+// freestanding macro expansion #2 of isolation in module IsolationMacro file IsolationMacro.swift line 58 column 26
+sil @$s14IsolationMacro0025IsolationMacroswift_jqFBgfMX57_25_9isolationfMf0_ : $@convention(thin) () -> ()
+
+// closure #2 in callerNonisolated()
+// Isolation: nonisolated
+sil private @$s14IsolationMacro17callerNonisolatedyyFyyXEfU0_ : $@convention(thin) @substituted <τ_0_0> () -> (@out τ_0_0, @error any Error) for <()> {
+// %0 "$return_value"
+bb0(%0 : $*()):
+  debug_value undef : $any Error, var, name "$error", argno 1 // id: %1
+  %2 = integer_literal $Builtin.Word, 1           // user: %4
+  // function_ref _allocateUninitializedArray<A>(_:)
+  %3 = function_ref @$ss27_allocateUninitializedArrayySayxG_BptBwlF : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // user: %4
+  %4 = apply %3<Any>(%2) : $@convention(thin) <τ_0_0> (Builtin.Word) -> (@owned Array<τ_0_0>, Builtin.RawPointer) // users: %6, %5
+  %5 = tuple_extract %4, 0                        // users: %7, %18
+  %6 = tuple_extract %4, 1                        // user: %7
+  %7 = mark_dependence %6 on %5                   // user: %8
+  %8 = pointer_to_address %7 to [strict] $*Any    // user: %15
+  %9 = string_literal utf8 "nonisolated explicit" // user: %14
+  %10 = integer_literal $Builtin.Word, 20         // user: %14
+  %11 = integer_literal $Builtin.Int1, -1         // user: %14
+  %12 = metatype $@thin String.Type               // user: %14
+  // function_ref String.init(_builtinStringLiteral:utf8CodeUnitCount:isASCII:)
+  %13 = function_ref @$sSS21_builtinStringLiteral17utf8CodeUnitCount7isASCIISSBp_BwBi1_tcfC : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %14
+  %14 = apply %13(%9, %10, %11, %12) : $@convention(method) (Builtin.RawPointer, Builtin.Word, Builtin.Int1, @thin String.Type) -> @owned String // user: %16
+  %15 = init_existential_addr %8, $String         // user: %16
+  store %14 to %15                                // id: %16
+  // function_ref _finalizeUninitializedArray<A>(_:)
+  %17 = function_ref @$ss27_finalizeUninitializedArrayySayxGABnlF : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // user: %18
+  %18 = apply %17<Any>(%5) : $@convention(thin) <τ_0_0> (@owned Array<τ_0_0>) -> @owned Array<τ_0_0> // users: %27, %24
+  // function_ref default argument 1 of print(_:separator:terminator:)
+  %19 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA0_ : $@convention(thin) () -> @owned String // user: %20
+  %20 = apply %19() : $@convention(thin) () -> @owned String // users: %26, %24
+  // function_ref default argument 2 of print(_:separator:terminator:)
+  %21 = function_ref @$ss5print_9separator10terminatoryypd_S2StFfA1_ : $@convention(thin) () -> @owned String // user: %22
+  %22 = apply %21() : $@convention(thin) () -> @owned String // users: %25, %24
+  // function_ref print(_:separator:terminator:)
+  %23 = function_ref @$ss5print_9separator10terminatoryypd_S2StF : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> () // user: %24
+  %24 = apply %23(%18, %20, %22) : $@convention(thin) (@guaranteed Array<Any>, @guaranteed String, @guaranteed String) -> ()
+  release_value %22                               // id: %25
+  release_value %20                               // id: %26
+  release_value %18                               // id: %27
+  %28 = tuple ()                                  // user: %29
+  return %28                                      // id: %29
+} // end sil function '$s14IsolationMacro17callerNonisolatedyyFyyXEfU0_'
+
+// freestanding macro expansion #1 of isolation in module IsolationMacro file IsolationMacro.swift line 64 column 19
+sil @$s14IsolationMacro0025IsolationMacroswift_jqFBgfMX63_18_9isolationfMf_ : $@convention(thin) () -> ()
+
+// Array._endMutation()
+sil shared [_semantics "array.end_mutation"] @$sSa12_endMutationyyF : $@convention(method) <Element> (@inout Array<Element>) -> () {
+[%0: noescape! **]
+// %0                                             // users: %9, %1
+bb0(%0 : $*Array<Element>):
+  %1 = struct_element_addr %0, #Array._buffer     // user: %2
+  %2 = struct_element_addr %1, #_ArrayBuffer._storage // user: %3
+  %3 = struct_element_addr %2, #_BridgeStorage.rawValue // user: %4
+  %4 = load %3                                    // user: %5
+  %5 = end_cow_mutation %4                        // user: %6
+  %6 = struct $_BridgeStorage<__ContiguousArrayStorageBase> (%5) // user: %7
+  %7 = struct $_ArrayBuffer<Element> (%6)         // user: %8
+  %8 = struct $Array<Element> (%7)                // user: %9
+  store %8 to %0                                  // id: %9
+  %10 = tuple ()                                  // user: %11
+  return %10                                      // id: %11
+} // end sil function '$sSa12_endMutationyyF'
+
+sil_vtable MyActor {
+  #MyActor.callerFromActor: (isolated MyActor) -> () -> () : @$s14IsolationMacro7MyActorC010callerFromD0yyF	// MyActor.callerFromActor()
+  #MyActor.init!allocator: (MyActor.Type) -> () -> MyActor : @$s14IsolationMacro7MyActorCACycfC	// MyActor.__allocating_init()
+  #MyActor.deinit!deallocator: @$s14IsolationMacro7MyActorCfD	// MyActor.__deallocating_deinit
+}
+
+sil_witness_table hidden MyActor: Actor module IsolationMacro {
+  method #Actor.unownedExecutor!getter: <Self where Self : Actor> (Self) -> () -> UnownedSerialExecutor : @$s14IsolationMacro7MyActorCScAAAScA15unownedExecutorScevgTW	// protocol witness for Actor.unownedExecutor.getter in conformance MyActor
+}
+
+
+
+// Mappings from '#fileID' to '#filePath':
+//   'IsolationMacro/IsolationMacro.swift' => 'IsolationMacro.swift'
+
+

@@ -1,0 +1,71 @@
+\section{Complete Example Inventory}
+\label{sec:appendix-examples}
+
+This appendix preserves the full worked-example set in compact paper form. The main body discusses only the most revealing cases in depth.
+
+\subsection{Example 1. Same-isolation ordinary use binds instead of consuming}
+
+\textsc{call-same-nonsendable-merge} refines the caller environment. A disconnected value passed to an ordinary same-isolation non-\code{sending} parameter remains usable, but it may become actor-bound and therefore lose eligibility for later transfer.
+
+\subsection{Example 2. Same-isolation \code{sending} versus cross-isolation consume}
+
+When $\isActorIsolated(@\kappa)$ and $@\kappa = @\iota$ hold, \textsc{call-nonsendable-noconsume} preserves the original region. When that same-isolation evidence fails, \textsc{call-nonsendable-consume} removes the binding from the caller environment.
+
+\codefile{snippets/same-vs-cross-sending.swift}
+
+\subsection{Example 3. Cross-isolation implicit transfer consumes}
+
+Explicit \code{sending} is not required for transfer. If a non-\code{Sendable} argument crosses to a distinct actor-isolated callee, $\canSend$ holds implicitly and the caller binding is consumed.
+
+\subsection{Example 4. Cross-isolation explicit \code{sending} consumes}
+
+An explicit \code{sending} parameter across isolation boundaries is the direct transfer case: the caller must provide a disconnected value and loses the binding after the call.
+
+\subsection{Example 5. \code{Task} capture distinguishes inherited and transferred closures}
+
+\code{Task.init} may preserve captures when same concrete actor inheritance is available.
+\code{Task.detached} and nonisolated task creation fall into the transfer branch and consume disconnected non-\code{Sendable} captures.
+
+\codefile{snippets/task-capture.swift}
+
+\subsection{Example 6. Nonisolated parameters behave like task regions}
+
+Non-\code{Sendable} parameters of a nonisolated function (sync or async) are task-bound rather than ordinary actor-bound values. This explains the closure-capture asymmetry between nonisolated or \code{@isolated(any)} closures and \code{@MainActor} closures after SE-0461.
+
+\codefile{snippets/nonisolated-async-task-region.swift}
+
+\subsection{Example 7. \code{@isolated(any)} requires \code{await}}
+
+Dynamic actor identity means a sync-looking \code{@isolated(any)} value still uses cross-isolation calling conventions.
+
+\codefile{snippets/isolated-any-await.swift}
+
+\subsection{Example 8. \code{isolated} parameters reuse the ordinary call rules}
+
+An \code{isolated} parameter does not require a new call-rule family. The passed actor witness determines callee isolation, after which the same-isolation and cross-isolation rules apply normally.
+
+\codefile{snippets/isolated-parameter.swift}
+
+\subsection{Example 9. Cross-isolation non-\code{sending} results are rejected}
+
+Cross-isolation non-\code{Sendable} results require explicit \code{sending}. Without that result-side guarantee, derivation fails because the caller cannot safely receive the value.
+
+\codefile{snippets/nonsending-result.swift}
+
+\subsection{Example 10. \code{\#isolation} removes the need for \code{@Sendable}}
+
+When \code{\#isolation} supplies same-isolation evidence to a higher-order helper, non-\code{@Sendable} closure capture and mutable local access remain legal because no cross-isolation boundary is introduced.
+
+\codefile{snippets/isolation-macro.swift}
+
+\subsection{Example 11. \code{async let} temporarily consumes captures with $\undosend$}
+
+\code{async let} creates a child task boundary that temporarily consumes non-\code{Sendable} captures. After \code{await}, captures that were not sent cross-isolation within the child task body are restored via $\undosend$. This distinguishes \code{async let} from \code{Task.init}: the latter either preserves captures through same-actor inheritance or permanently consumes them, whereas \code{async let} supports temporary consumption with restoration.
+
+\subsection{Example 12. Nonisolated sync: ``callable from'' $\neq$ ``convertible to''}
+
+\textsc{call-nonisolated-sync} allows any actor-isolated context to call a nonisolated sync function without \code{await}. However, this call-site property does not yield a new function type conversion edge (\textsc{func-conv}). Closure wrapping \code{\{ g() \}} involves two independent checks: (1)~a \emph{capture check}---whether \code{g}'s region can cross into the closure's isolation---and (2)~a \emph{call check}---whether the closure body can invoke \code{g()}, which always succeeds via \textsc{call-nonisolated-sync}. A \disconnected{} local or a \sending{} parameter passes the capture check; an ordinary parameter at \task{} region does not.
+
+\codefile{snippets/nonisolated-sync-call-vs-capture.swift}
+
+Together, these twelve examples cover the paper's main semantic contrasts: binding versus consumption, same-isolation evidence versus dynamic uncertainty, argument transfer versus result acceptance, temporary versus permanent capture consumption, and call-site compatibility versus type-level convertibility.

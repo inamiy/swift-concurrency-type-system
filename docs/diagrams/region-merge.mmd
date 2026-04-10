@@ -1,0 +1,16 @@
+%%{init: {"theme": "dark", "themeVariables": {"fontSize": "20px"}} }%%
+flowchart LR
+    DISC["disconnected (⊥)"]
+    ISO["isolated(a)"]
+    TASK["task"]
+    TOP["invalid (⊤)"]
+
+    DISC --> ISO
+    DISC --> TASK
+    ISO --> TOP
+    TASK --> TOP
+
+    style DISC fill:#2d8659,stroke:#5cb88a,color:#fff
+    style ISO fill:#2f5f9e,stroke:#78a9e2,color:#fff
+    style TASK fill:#5a4e9e,stroke:#9a8fe2,color:#fff
+    style TOP fill:#8b3a3a,stroke:#c46060,color:#fff
