@@ -3,7 +3,7 @@ GENERATED_DIR = docs/generated
 SPLIT_MMD_SH = docs/scripts/split-func-conversion-mmd.sh
 FULL_MMD = $(DIAGRAMS_DIR)/func-conversion-rules.mmd
 REGION_MMD = $(DIAGRAMS_DIR)/region-merge.mmd
-MMDC = slide/node_modules/.bin/mmdc
+MMDC = slide/node_modules/.bin/mmdc -p puppeteer-config.json
 
 DIAGRAM_FILES = func-conversion-sync func-conversion-async func-conversion region-merge-semilattice
 
