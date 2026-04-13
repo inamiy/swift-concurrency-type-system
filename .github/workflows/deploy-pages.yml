@@ -32,6 +32,9 @@ jobs:
       - name: Build slide HTML
         run: make -C slide html
 
+      - name: Rename slide for deploy
+        run: mv slide/dist/swift-concurrency-type-system-slide.html slide/dist/slide.html
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
