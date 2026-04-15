@@ -195,7 +195,9 @@ So the shape of the judgment becomes a little richer:
 Γ; @κ; α ⊢ e : T at ρ  ⊣  Γ'
 ```
 
-Here, `Γ` is the environment "before reading the expression," and `Γ'` is the environment "after reading the expression."
+Here, `Γ` is the input environment "before reading the expression," and `Γ'` is the output environment "after reading the expression."
+The symbol `⊣` (Unicode name `LEFT TACK`, written as `\dashv` in LaTeX) separates those two sides,
+and can be read as "processing the expression on the left yields the environment on the right."
 In other words, the notation directly exposes how the compiler's dictionary is updated line by line.
 
 To build the intuition for that, Swift Ownership is easier to understand than Swift Concurrency.
