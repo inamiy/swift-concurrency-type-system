@@ -4,8 +4,13 @@ Formal typing rules and presentation materials for Swift 6.2's concurrency type 
 
 Presented at [try! Swift Tokyo 2026](https://tryswift.jp/).
 
+- Video: https://youtu.be/Vs_hytYk3HU
 - Slide (HTML): https://inamiy.github.io/swift-concurrency-type-system/slide.html
 - Slide (PDF): https://speakerdeck.com/inamiy/swift-concurrency-type-system
+
+<a href="https://youtu.be/Vs_hytYk3HU">
+  <img src="https://img.youtube.com/vi/Vs_hytYk3HU/maxresdefault.jpg" alt="Video" width="600">
+</a>
 
 ## Outputs
 
