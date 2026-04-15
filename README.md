@@ -13,6 +13,8 @@ Presented at [try! Swift Tokyo 2026](https://tryswift.jp/).
 |--------|------|-------------|
 | Slide (PDF) | [swift-concurrency-type-system-slide.pdf](swift-concurrency-type-system-slide.pdf) | Marp slide deck |
 | Paper (PDF) | [swift-concurrency-type-system-paper.pdf](swift-concurrency-type-system-paper.pdf) | LaTeX paper (ACM sigplan format) |
+| Beginner Guide (JA) | [docs/beginner-guide-ja.md](docs/beginner-guide-ja.md) | Gentle introduction to basic logic / typed lambda calculus notation |
+| Beginner Guide (EN) | [docs/beginner-guide-en.md](docs/beginner-guide-en.md) | English translation of the beginner guide |
 | Typing Rules (JA) | [docs/typing-rules-ja.md](docs/typing-rules-ja.md) | Source of truth (Japanese) |
 | Typing Rules (EN) | [docs/typing-rules-en.md](docs/typing-rules-en.md) | English translation |
 
@@ -45,25 +47,27 @@ Covers function conversion rules, `sending` as affine transfer, region merge as 
 
 ```
 ./
-├── docs/                   # Formal typing rules & conversion diagrams
-│   ├── typing-rules-ja.md  # Source of truth (Japanese)
-│   ├── typing-rules-en.md  # English translation (must be kept in sync with -ja)
+├── docs/                    # Formal typing rules, beginner guide & conversion diagrams
+│   ├── beginner-guide-ja.md # Gentle introduction to logic / typed lambda calculus notation
+│   ├── beginner-guide-en.md # English translation of the beginner guide
+│   ├── typing-rules-ja.md   # Source of truth (Japanese)
+│   ├── typing-rules-en.md   # English translation (must be kept in sync with -ja)
 │   ├── scripts/             # Helper scripts (markdown-toc, Mermaid splitter)
 │   └── diagrams/            # Mermaid diagram sources
-├── swift/                  # SwiftPM package (swift-tools-version: 6.2, Swift 6 mode)
+├── swift/                   # SwiftPM package (swift-tools-version: 6.2, Swift 6 mode)
 │   ├── Sources/
-│   │   └── concurrency-type-check/  # Isolation/region/sending experiments
+│   │   └── concurrency-type-check/   # Isolation/region/sending experiments
 │   └── Tests/
 │       └── concurrency-type-checkTests/
-├── swift-sil/              # SIL dump analysis (Swift source + emitted SIL pairs)
-│   └── docs/               # SIL reading guides
-├── slide/                  # Marp-based presentation (md -> html via marp-cli)
-│   ├── src/                # Slide source (md, themes, assets)
-│   └── scripts/            # Build scripts (mermaid splitter, TTS)
-├── paper/                  # LaTeX paper (ACM sigplan format via tectonic)
-└── swiftlang/              # Git submodules (read-only reference, git-ignored)
-    ├── swift/              # Official Swift compiler source
-    └── swift-evolution/    # Swift Evolution proposals
+├── swift-sil/               # SIL dump analysis (Swift source + emitted SIL pairs)
+│   └── docs/                # SIL reading guides
+├── slide/                   # Marp-based presentation (md -> html via marp-cli)
+│   ├── src/                 # Slide source (md, themes, assets)
+│   └── scripts/             # Build scripts (mermaid splitter, TTS)
+├── paper/                   # LaTeX paper (ACM sigplan format via tectonic)
+└── swiftlang/               # Git submodules (read-only reference, git-ignored)
+    ├── swift/               # Official Swift compiler source
+    └── swift-evolution/     # Swift Evolution proposals
 ```
 
 ## Commands
