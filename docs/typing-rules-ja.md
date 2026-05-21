@@ -38,6 +38,11 @@
     - [`canSend`](#cansend)
   - [2.8 Sendable Inference 補助定義 (SE-0418)](#28-sendable-inference-補助定義-se-0418)
   - [2.9 Isolation Subtyping / Coercion (`isoSubtyping`, `isoCoercion`)](#29-isolation-subtyping--coercion-isosubtyping-isocoercion)
+  - [2.10 引数の初期 region (`initArgRegion`)](#210-引数の初期-region-initargregion)
+    - [init-arg-sendable](#init-arg-sendable)
+    - [init-arg-sending](#init-arg-sending)
+    - [init-arg-actor-isolated](#init-arg-actor-isolated)
+    - [init-arg-nonisolated](#init-arg-nonisolated)
 - [3. 同期・非同期境界 (Sync/Async Boundaries)](#3-同期非同期境界-syncasync-boundaries)
   - [3.1 async 関数本体 (`α` の導入境界)](#31-async-関数本体-α-の導入境界)
     - [decl-fun-isolated-param](#decl-fun-isolated-param)
@@ -635,6 +640,99 @@ isoCoercion(@σ₁, ι₁, @σ₂, ι₂, α')
   - 特別形: `@isolated(localActor)` (`(isolated LocalActor, ...) -> ...` 形の local actor parameter branch を表す shorthand)
 - `α'`: 関数自体の async mode (`sync` or `async`)
 
+### 2.10 引数の初期 region (`initArgRegion`)
+
+`initArgRegion(@ι, A, [sending])` は「宣言 elaboration 時に、関数引数の初期 region を決める」補助関数である。
+[`decl-fun`](#31-async-関数本体-α-の導入境界) の entry 環境 `Γ_{body} = x₁ : A₁ at ρ₁, …, xₙ : Aₙ at ρₙ` で各 `ρᵢ` をこの関数から導く:
+
+```text
+ρᵢ = initArgRegion(@ι, Aᵢ, [sending]ᵢ)
+```
+
+引数:
+
+- `@ι`: 関数の isolation annotation (関数宣言シグネチャから projection された値)
+- `A`: 引数の型
+- `[sending]`: 引数に `sending` キーワードが付いているか (`[sending] ::= sending | ·`、[`[sending]` の定義](#sending-の定義) を参照)
+
+定義は次の 4 つの相互排他的な inference rule によって与える。
+
+#### init-arg-sendable
+
+```text
+A : Sendable
+──────────────────────────────────────────────── (init-arg-sendable)
+initArgRegion(@ι, A, [sending]) = _
+```
+
+正規形条件 (`T : Sendable ⇔ ρ = _`) を満たすための規則。`Sendable` 値は常に region `_` に置かれる。
+
+#### init-arg-sending
+
+```text
+A : ~Sendable    [sending] ∈ { sending }
+──────────────────────────────────────────────── (init-arg-sending)
+initArgRegion(@ι, A, sending) = disconnected
+```
+
+(SE-0430): `sending` 注釈は `@ι` の値に関わらず常に `disconnected` を割り当てる。型レベルの契約として「caller は転送後この引数を保持しない」ことが保証されているため、callee 本体内で `~Sendable` 値を独立した region として扱える。
+
+#### init-arg-actor-isolated
+
+```text
+A : ~Sendable    [sending] ∉ { sending }
+@ι = @isolated(a)
+──────────────────────────────────────────────── (init-arg-actor-isolated)
+initArgRegion(@isolated(a), A, ·) = isolated(a)
+```
+
+`@isolated(globalActor)` (例: `@MainActor`) や `@isolated(actorInstance)` の本体では、`~Sendable` 引数を **本体が走る actor の region** (`isolated(a)`) に置く。本体が actor の serial executor 上で走る以上、引数も同じ actor 領域に住まわせるのが最も情報量の多い保守的選択となる。
+
+#### init-arg-nonisolated
+
+```text
+A : ~Sendable    [sending] ∉ { sending }
+@ι = @nonisolated
+──────────────────────────────────────────────── (init-arg-nonisolated)
+initArgRegion(@nonisolated, A, ·) = task
+```
+
+`@nonisolated` 本体では `~Sendable` 引数を `task` region に置く。`task` は「caller-owned であり、特定の actor に束縛されていない」を表す。sync の場合も関数は任意の isolation context から呼ばれ得るため、引数を特定 actor に帰属させることは静的に安全でない。
+
+注:
+
+- `@ι = @isolated(any)`: [`toCapability`](#25-capability--region-変換-toregionκ) により `toCapability(@isolated(any)) = @nonisolated` なので body は `@nonisolated` で型付けされ、[`init-arg-nonisolated`](#init-arg-nonisolated) (= `task`) が適用される。
+- `@ι = @concurrent`: 同様に `toCapability(@concurrent) = @nonisolated` となり [`init-arg-nonisolated`](#init-arg-nonisolated) (= `task`) が適用される。
+- SE-0461 `NonisolatedNonsendingByDefault` 有効時、`@nonisolated async` の本体は呼び出し側の isolation を継承する (= caller-inheriting) ため、コンパイラ内部表現上は `task` を `nonisolated-nonsending-task-isolated` 修飾子付きでマークする (`SILIsolationInfo::withNonisolatedNonsendingTaskIsolated`)。本書の region 抽象では `task` のままで扱う (call site 規則の [`call-nonisolated-async-inherit`](#call-nonisolated-async-inherit) 等で吸収される)。
+- closure-captured async-let parameter は内部実装上の特殊ケースとして `disconnected` を割り当てる (compiler コメント参照)。本書ではこの edge case は明示的にカバーしない。
+
+コンパイラ実装:
+
+- `lib/SILOptimizer/Utils/SILIsolationInfo.cpp` `SILIsolationInfo::get(SILArgument *)`
+  - `fArg->isSending()` → `getDisconnected()`  ⇒ [`init-arg-sending`](#init-arg-sending)
+  - `functionIsolation.isGlobalActor()` → `getGlobalActorIsolated(...)`  ⇒ [`init-arg-actor-isolated`](#init-arg-actor-isolated) (global actor 枝)
+  - `functionIsolation.isActorInstanceIsolated()` (via `maybeGetIsolatedArgument()`) → `getActorInstanceIsolated(...)`  ⇒ [`init-arg-actor-isolated`](#init-arg-actor-isolated) (instance 枝)
+  - fallback → `getTaskIsolated(...)`  ⇒ [`init-arg-nonisolated`](#init-arg-nonisolated)
+- `lib/SILOptimizer/Analysis/RegionAnalysis.cpp` `canFunctionArgumentBeSent()` — partition 配置側。`arg->isSending()` のみ独立 region に分離する点が [`init-arg-sending`](#init-arg-sending) と対応 (上記実装と「stay in sync」とコメントで明記)。
+- `lib/SILOptimizer/Analysis/RegionAnalysis.cpp` 初期 entry partition 生成 — `sending` 引数は個別 region、 non-`sending` 引数は単一の merged region に配置。
+
+検証 (Swift 6.2):
+
+- [`init-arg-sendable`](#init-arg-sendable):
+  - `initArgRegion_sendable_anyBody_unrestricted()` — Sendable 引数は region `_` で扱われ、任意の isolation 境界を越えて受け渡し可能
+- [`init-arg-sending`](#init-arg-sending):
+  - `initArgRegion_sending_mainActorBody_paramAtDisconnected()` — `@MainActor` 本体で `sending` 引数が `disconnected` (cross-iso transfer 成功)
+  - `initArgRegion_sending_nonisolatedBody_paramAtDisconnected()` — `@nonisolated` 本体でも同様
+- [`init-arg-actor-isolated`](#init-arg-actor-isolated) (global actor 枝):
+  - `initArgRegion_mainActorBody_paramAtIsolatedMainActor()` — `@MainActor` 本体の non-`sending` 引数が `isolated(MainActor)` (同 region へ束縛可能)
+  - `negative_initArgRegion_mainActorBody_cannotSendCrossActor()` (`NEGATIVE_INIT_ARG_ACTOR_ISOLATED_MAINACTOR_CANNOT_CROSS`) — `isolated(MainActor) ≠ disconnected` の裏付け
+- [`init-arg-actor-isolated`](#init-arg-actor-isolated) (actor instance 枝):
+  - `InitArgRegionProbeActor.paramAtIsolatedSelf()` — actor method の non-`sending` 引数が `isolated(self)` (actor state への束縛可能)
+  - `InitArgRegionProbeActor.negative_actorInstance_cannotSendCrossActor()` (`NEGATIVE_INIT_ARG_ACTOR_INSTANCE_CANNOT_CROSS`) — `isolated(self) ≠ disconnected` の裏付け
+- [`init-arg-nonisolated`](#init-arg-nonisolated):
+  - `initArgRegion_nonisolatedSync_paramAtTask()` / `initArgRegion_nonisolatedAsync_paramAtTask()` — `@nonisolated` 本体の non-`sending` 引数が `task` (nonisolated / `@isolated(any)` クロージャに capture 可能)
+  - `negative_initArgRegion_nonisolatedSync_cannotCaptureInMainActorClosure()` / `negative_initArgRegion_nonisolatedAsync_cannotCaptureInMainActorClosure()` (`NEGATIVE_INIT_ARG_NONISOLATED_TASK_NOT_CAPTURABLE_BY_MAINACTOR`) — `task ≠ isolated(MainActor)` の裏付け
+
 ---
 
 ## 3. 同期・非同期境界 (Sync/Async Boundaries)
@@ -661,28 +759,16 @@ Swift の `func ... async -> R { ... }` は **宣言**であり、本ドキュ�
 
 Note: `Γ_{body}` は「関数本体に入った直後 (body entry) の環境」を表す。
 
-引数の初期 region `ρᵢ` は基本的に宣言型付け (elaboration) で決まるが、本書では次の条件を明示的に採用する:
+各引数の初期 region `ρᵢ` は、宣言 elaboration 時に [`initArgRegion`](#210-引数の初期-region-initargregion) によって決まる:
 
 ```text
-(@ι = @nonisolated)  ∧  (Aᵢ : ~Sendable)  ⇒  ρᵢ = task
+ρᵢ = initArgRegion(@ι, Aᵢ, [sending]ᵢ)
 ```
 
-すなわち `nonisolated` 関数本体 (sync/async 問わず) では、`~Sendable` 引数は `task` region として扱う。
-`task` region は「caller-owned であり、特定の actor に束縛されていない」ことを表す。
-sync の場合も関数は任意の isolation context から呼ばれ得るため、引数を特定 actor に帰属させることは静的に安全でない。
-一方、actor-isolated 本体 (`@κ = @isolated(a)`) では、この条件は適用されない。
-ただしこれは「`@κ` から機械的に `ρᵢ := isolated(a)` へ一律書き換えする」という意味ではなく、entry 環境 `Γ_{body}` の形成時に引数の初期 region が決まる、という意味である。
-
-検証 (Swift 6.2):
-- `swift/Sources/concurrency-type-check/TypingRules.swift` `nonisolatedAsync_paramBehavesLikeTaskRegion()`
-- `swift/Sources/concurrency-type-check/TypingRules.swift` `negative_nonisolatedAsync_parameterCannotBeCapturedByMainActorClosure_isError()` (`NEGATIVE_NONISOLATED_ASYNC_PARAM_MAINACTOR_CAPTURE`)
-- `swift/Sources/concurrency-type-check/TypingRules.swift` `nonisolated_paramCapture_compiles()`
-- `swift/Sources/concurrency-type-check/TypingRules.swift` `negative_nonisolated_parameterCannotBeCapturedByMainActorClosure_isError()` (`NEGATIVE_NONISOLATED_SYNC_PARAM_MAINACTOR_CAPTURE`)
-- `swift/Sources/concurrency-type-check/TypingRules.swift` `mainActor_paramCapture_isActorIsolated_compiles()`
-- `swift/Sources/concurrency-type-check/TypingRules.swift` `negative_mainActorParamSendAcrossActor_isError()` (`NEGATIVE_MAINACTOR_PARAM_SEND_ACROSS_ACTOR`)
+詳細な分岐 ([`init-arg-sendable`](#init-arg-sendable) / [`init-arg-sending`](#init-arg-sending) / [`init-arg-actor-isolated`](#init-arg-actor-isolated) / [`init-arg-nonisolated`](#init-arg-nonisolated)) およびコンパイラ実装との対応は [引数の初期 region (`initArgRegion`)](#210-引数の初期-region-initargregion) を参照。
 
 重要: `@isolated(MainActor)` で本体を型チェックすることと、`ρ` の更新は別レイヤである。
-`ρᵢ` の初期値は `Γ_{body}` 形成 (elaboration) で決まり、式の評価中に起きる束縛・精密化 (`disconnected → isolated(MainActor)` など) は [`region-merge`](#region-merge) や [`call-same-nonsendable-merge`](#call-same-nonsendable-merge) のような **bind/merge 規則**で表す。
+`ρᵢ` の初期値は `Γ_{body}` 形成 (elaboration) で `initArgRegion` により決まり、式の評価中に起きる束縛・精密化 (`disconnected → isolated(MainActor)` など) は [`region-merge`](#region-merge) や [`call-same-nonsendable-merge`](#call-same-nonsendable-merge) のような **bind/merge 規則**で表す。
 
 一般化: ここでは `@MainActor` に限らず、宣言の関数型 annotation `@φ` (`= @σ @ι`) から body の capability `@κ` を `toCapability(proj_ι(@φ))` で決定する。
 関数宣言の最小形は次の雛形になる:
@@ -1943,6 +2029,7 @@ A : ~Sendable    B : Sendable
 - `swift/Sources/concurrency-type-check/TypingRules.swift` `concurrentAsync_callWithDisconnectedNonSendable_compiles()`
 - `swift/Sources/concurrency-type-check/TypingRules.swift` `concurrentAsync_callThenSend_compiles()`
 - `swift/Sources/concurrency-type-check/TypingRules.swift` `negative_concurrentAsync_callWithActorBoundNonSendable_isError()` (`NEGATIVE_CONCURRENT_CALL_ACTOR_BOUND_ARG`)
+- `swift/Sources/concurrency-type-check/TypingRules.swift` `negative_concurrentCall_closureLiteralFromGlobalActor_isError()` (`NEGATIVE_CONCURRENT_CALL_CLOSURE_LITERAL_FROM_GLOBAL_ACTOR`)
 
 ```swift
 @MainActor
@@ -1959,6 +2046,26 @@ func concurrentCall_disconnectedNonSendableExample() async {
     // await f(mainActorConnectedVar) // ❌ error (negative test: actor-bound argument)
 }
 ```
+
+`A : ~Sendable` の値が `closure literal` の場合も同じ規則が効く。
+パラメータが `@Sendable` でも `sending` でもないとき、[`closure-inherit-parent`](#closure-inherit-parent) によりクロージャは caller の isolation を継承し、`isolated(globalActor)` リージョンに置かれる。
+このため `arg : A at disconnected` 前提を満たせず、`call-concurrent-nonsendable` も適用できない:
+
+```swift
+@concurrent
+func concurrentTakingNonSendableAsyncClosure(_ body: () async -> Void) async {}
+
+@MainActor
+func concurrentCall_closureLiteralFromGlobalActor_errorExample() async {
+    // closure literal `{}` inherits @MainActor via closure-inherit-parent
+    // → its region is isolated(MainActor), not disconnected
+    // → call-concurrent-nonsendable premise (arg at disconnected) fails
+    // await concurrentTakingNonSendableAsyncClosure {} // ❌ sending value of non-Sendable type
+}
+```
+
+参考: [Swift Forums — Isolated closures and `@concurrent` functions](https://forums.swift.org/t/isolated-closures-and-concurrent-functions/86614)
+回避策はクロージャ側を inference boundary にすること (`@Sendable` を付ける / `sending` 引数として宣言する / パラメータ型に明示的な isolation を付ける) で、いずれも [`closure-no-inherit-parent`](#closure-no-inherit-parent) または `Sendable` な関数型に変わり [`call-concurrent-sendable`](#call-concurrent-sendable) が適用可能になる。
 
 #### call-nonisolated-async-inherit
 
