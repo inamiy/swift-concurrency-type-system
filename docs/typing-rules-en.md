@@ -38,6 +38,11 @@ This document systematically summarizes the typing rules for Swift 6.2 Concurren
     - [`canSend`](#cansend)
   - [2.8 Sendable Inference Auxiliary Definitions (SE-0418)](#28-sendable-inference-auxiliary-definitions-se-0418)
   - [2.9 Isolation Subtyping / Coercion (`isoSubtyping`, `isoCoercion`)](#29-isolation-subtyping--coercion-isosubtyping-isocoercion)
+  - [2.10 Initial Parameter Region (`initArgRegion`)](#210-initial-parameter-region-initargregion)
+    - [init-arg-sendable](#init-arg-sendable)
+    - [init-arg-sending](#init-arg-sending)
+    - [init-arg-actor-isolated](#init-arg-actor-isolated)
+    - [init-arg-nonisolated](#init-arg-nonisolated)
 - [3. Sync/Async Boundaries](#3-syncasync-boundaries)
   - [3.1 async Function Body (introduction boundary of `α`)](#31-async-function-body-introduction-boundary-of-α)
     - [decl-fun-isolated-param](#decl-fun-isolated-param)
@@ -620,6 +625,101 @@ They hold when derivable under any of the corresponding rules, and do not hold (
   - Special form: `@isolated(localActor)` (shorthand representing the local actor parameter branch of `(isolated LocalActor, ...) -> ...`)
 - `α'`: the async mode of the function itself (`sync` or `async`)
 
+### 2.10 Initial Parameter Region (`initArgRegion`)
+
+`initArgRegion(@ι, A, [sending])` is an auxiliary function that "determines the initial region of a function parameter at declaration elaboration time."
+Each `ρᵢ` in [`decl-fun`](#31-async-function-body-introduction-boundary-of-α)'s entry environment `Γ_{body} = x₁ : A₁ at ρ₁, …, xₙ : Aₙ at ρₙ` is derived from this function:
+
+```text
+ρᵢ = initArgRegion(@ι, Aᵢ, [sending]ᵢ)
+```
+
+Arguments:
+
+- `@ι`: the function's isolation annotation (the value projected from the function declaration's signature)
+- `A`: the type of the parameter
+- `[sending]`: whether the parameter carries the `sending` keyword (`[sending] ::= sending | ·`, see [definition of `[sending]`](#definition-of-sending))
+
+The definition is given by the following four mutually exclusive inference rules.
+
+#### init-arg-sendable
+
+```text
+A : Sendable
+──────────────────────────────────────────────── (init-arg-sendable)
+initArgRegion(@ι, A, [sending]) = _
+```
+
+The rule that enforces the normalization condition (`T : Sendable ⇔ ρ = _`). `Sendable` values are always placed in region `_`.
+
+#### init-arg-sending
+
+```text
+A : ~Sendable    [sending] ∈ { sending }
+──────────────────────────────────────────────── (init-arg-sending)
+initArgRegion(@ι, A, sending) = disconnected
+```
+
+(SE-0430): The `sending` annotation always assigns `disconnected` regardless of `@ι`. Because the type-level contract guarantees that "the caller does not retain this parameter after transfer," the callee body can treat the `~Sendable` value as an independent region.
+
+#### init-arg-actor-isolated
+
+```text
+A : ~Sendable    [sending] ∉ { sending }
+@ι = @isolated(a)
+──────────────────────────────────────────────── (init-arg-actor-isolated)
+initArgRegion(@isolated(a), A, ·) = isolated(a)
+```
+
+In a body of `@isolated(globalActor)` (e.g. `@MainActor`) or `@isolated(actorInstance)`, a `~Sendable` parameter is placed in **the region of the actor the body runs on** (`isolated(a)`). Since the body runs on the actor's serial executor, placing the parameter in the same actor region is the most informative conservative choice.
+
+#### init-arg-nonisolated
+
+```text
+A : ~Sendable    [sending] ∉ { sending }
+@ι = @nonisolated
+──────────────────────────────────────────────── (init-arg-nonisolated)
+initArgRegion(@nonisolated, A, ·) = task
+```
+
+In a `@nonisolated` body, `~Sendable` parameters are placed in the `task` region. `task` represents "caller-owned and not bound to any specific actor." Even in the sync case, the function may be called from any isolation context, so statically assigning the parameter to a specific actor is not safe.
+
+Notes:
+
+- `@ι = @isolated(any)`: Since [`toCapability`](#25-capability--region-conversion-toregionκ) gives `toCapability(@isolated(any)) = @nonisolated`, the body is type-checked under `@nonisolated`, and [`init-arg-nonisolated`](#init-arg-nonisolated) (= `task`) applies.
+- `@ι = @concurrent`: Similarly `toCapability(@concurrent) = @nonisolated`, so [`init-arg-nonisolated`](#init-arg-nonisolated) (= `task`) applies.
+- When SE-0461 `NonisolatedNonsendingByDefault` is enabled, the body of `@nonisolated async` inherits the caller's isolation (= caller-inheriting), and the compiler's internal representation marks `task` with the `nonisolated-nonsending-task-isolated` qualifier (`SILIsolationInfo::withNonisolatedNonsendingTaskIsolated`). In this document's region abstraction, it is still treated as plain `task` (subsumed by call-site rules such as [`call-nonisolated-async-inherit`](#call-nonisolated-async-inherit)).
+- Closure-captured async-let parameters are assigned `disconnected` as an internal implementation special case (see compiler comments). This edge case is not explicitly covered in this document.
+
+Compiler implementation:
+
+- `lib/SILOptimizer/Utils/SILIsolationInfo.cpp` `SILIsolationInfo::get(SILArgument *)`
+  - `fArg->isSending()` → `getDisconnected()`  ⇒ [`init-arg-sending`](#init-arg-sending)
+  - `functionIsolation.isGlobalActor()` → `getGlobalActorIsolated(...)`  ⇒ [`init-arg-actor-isolated`](#init-arg-actor-isolated) (global actor branch)
+  - `functionIsolation.isActorInstanceIsolated()` (via `maybeGetIsolatedArgument()`) → `getActorInstanceIsolated(...)`  ⇒ [`init-arg-actor-isolated`](#init-arg-actor-isolated) (instance branch)
+  - fallback → `getTaskIsolated(...)`  ⇒ [`init-arg-nonisolated`](#init-arg-nonisolated)
+- `lib/SILOptimizer/Analysis/RegionAnalysis.cpp` `canFunctionArgumentBeSent()` — partition placement side. Only `arg->isSending()` separates into its own region, corresponding to [`init-arg-sending`](#init-arg-sending) (explicitly noted as "stay in sync" with the implementation above in the comments).
+- `lib/SILOptimizer/Analysis/RegionAnalysis.cpp` initial entry partition construction — `sending` parameters are placed in individual regions, while non-`sending` parameters are placed in a single merged region.
+
+Verification (Swift 6.2):
+
+The PoC is consolidated in the MARK section `initArgRegion (decl-fun parameter region elaboration)` of `swift/Sources/concurrency-type-check/TypingRules.swift`. Each branch is paired with one positive test and, where applicable, a negative test for confirmation:
+
+- [`init-arg-sendable`](#init-arg-sendable):
+  - `initArgRegion_sendable_anyBody_unrestricted()` — `Sendable` parameter is treated as region `_` and can be passed across any isolation boundary
+- [`init-arg-sending`](#init-arg-sending):
+  - `initArgRegion_sending_mainActorBody_paramAtDisconnected()` — in `@MainActor` body, `sending` parameter is `disconnected` (cross-iso transfer succeeds)
+  - `initArgRegion_sending_nonisolatedBody_paramAtDisconnected()` — same in `@nonisolated` body
+- [`init-arg-actor-isolated`](#init-arg-actor-isolated) (global actor branch):
+  - `initArgRegion_mainActorBody_paramAtIsolatedMainActor()` — non-`sending` parameter in `@MainActor` body is `isolated(MainActor)` (bindable into the same region)
+  - `negative_initArgRegion_mainActorBody_cannotSendCrossActor()` (`NEGATIVE_INIT_ARG_ACTOR_ISOLATED_MAINACTOR_CANNOT_CROSS`) — confirms `isolated(MainActor) ≠ disconnected`
+- [`init-arg-actor-isolated`](#init-arg-actor-isolated) (actor instance branch):
+  - `InitArgRegionProbeActor.paramAtIsolatedSelf()` — non-`sending` parameter in actor method is `isolated(self)` (bindable into actor state)
+  - `InitArgRegionProbeActor.negative_actorInstance_cannotSendCrossActor()` (`NEGATIVE_INIT_ARG_ACTOR_INSTANCE_CANNOT_CROSS`) — confirms `isolated(self) ≠ disconnected`
+- [`init-arg-nonisolated`](#init-arg-nonisolated):
+  - `initArgRegion_nonisolatedSync_paramAtTask()` / `initArgRegion_nonisolatedAsync_paramAtTask()` — non-`sending` parameter in `@nonisolated` body is `task` (capturable by nonisolated / `@isolated(any)` closures)
+  - `negative_initArgRegion_nonisolatedSync_cannotCaptureInMainActorClosure()` / `negative_initArgRegion_nonisolatedAsync_cannotCaptureInMainActorClosure()` (`NEGATIVE_INIT_ARG_NONISOLATED_TASK_NOT_CAPTURABLE_BY_MAINACTOR`) — confirms `task ≠ isolated(MainActor)`
+
 ---
 
 ## 3. Sync/Async Boundaries
@@ -643,23 +743,15 @@ Reading: "The body `body` of `@MainActor func foo(...) async` is checked in a co
 
 Note: `Γ_{body}` denotes the environment immediately upon entering the function body (body entry).
 
-The initial region `ρᵢ` for each parameter is determined by declaration type-checking (elaboration), but this document explicitly adopts the following condition:
+The initial region `ρᵢ` for each parameter is determined at declaration elaboration time by [`initArgRegion`](#210-initial-parameter-region-initargregion):
 
 ```text
-(@ι = @nonisolated)  ∧  (Aᵢ : ~Sendable)  ⇒  ρᵢ = task
+ρᵢ = initArgRegion(@ι, Aᵢ, [sending]ᵢ)
 ```
 
-That is, in a `nonisolated` function body (sync or async), `~Sendable` parameters are treated as `task` region. The `task` region means "caller-owned and not bound to any specific actor." Even in the sync case, a function may be called from any isolation context, so statically assigning parameters to a specific actor is not safe. In an actor-isolated body (`@κ = @isolated(a)`), this condition does not apply. Note that this does not mean "mechanically rewriting `ρᵢ := isolated(a)` from `@κ` uniformly"; rather, it means that the initial region of parameters is determined when forming the entry environment `Γ_{body}`.
+See [Initial Parameter Region (`initArgRegion`)](#210-initial-parameter-region-initargregion) for the detailed branches ([`init-arg-sendable`](#init-arg-sendable) / [`init-arg-sending`](#init-arg-sending) / [`init-arg-actor-isolated`](#init-arg-actor-isolated) / [`init-arg-nonisolated`](#init-arg-nonisolated)) and the correspondence with the compiler implementation.
 
-Verification (Swift 6.2):
-- `swift/Sources/concurrency-type-check/TypingRules.swift` `nonisolatedAsync_paramBehavesLikeTaskRegion()`
-- `swift/Sources/concurrency-type-check/TypingRules.swift` `negative_nonisolatedAsync_parameterCannotBeCapturedByMainActorClosure_isError()` (`NEGATIVE_NONISOLATED_ASYNC_PARAM_MAINACTOR_CAPTURE`)
-- `swift/Sources/concurrency-type-check/TypingRules.swift` `nonisolated_paramCapture_compiles()`
-- `swift/Sources/concurrency-type-check/TypingRules.swift` `negative_nonisolated_parameterCannotBeCapturedByMainActorClosure_isError()` (`NEGATIVE_NONISOLATED_SYNC_PARAM_MAINACTOR_CAPTURE`)
-- `swift/Sources/concurrency-type-check/TypingRules.swift` `mainActor_paramCapture_isActorIsolated_compiles()`
-- `swift/Sources/concurrency-type-check/TypingRules.swift` `negative_mainActorParamSendAcrossActor_isError()` (`NEGATIVE_MAINACTOR_PARAM_SEND_ACROSS_ACTOR`)
-
-Important: Type-checking the body under `@isolated(MainActor)` and updating `ρ` are separate layers. The initial value of `ρᵢ` is determined during `Γ_{body}` formation (elaboration), and the binding/refinement that occurs during expression evaluation (e.g., `disconnected → isolated(MainActor)`) is expressed by **bind/merge rules** such as [`region-merge`](#region-merge) and [`call-same-nonsendable-merge`](#call-same-nonsendable-merge).
+Important: Type-checking the body under `@isolated(MainActor)` and updating `ρ` are separate layers. The initial value of `ρᵢ` is determined during `Γ_{body}` formation (elaboration) by `initArgRegion`, and the binding/refinement that occurs during expression evaluation (e.g., `disconnected → isolated(MainActor)`) is expressed by **bind/merge rules** such as [`region-merge`](#region-merge) and [`call-same-nonsendable-merge`](#call-same-nonsendable-merge).
 
 Generalization: Not limited to `@MainActor`, the body capability `@κ` is determined from the function declaration's type annotation `@φ` (`= @σ @ι`) via `toCapability(proj_ι(@φ))`. The minimal template for a function declaration is:
 
@@ -1874,6 +1966,7 @@ Verification (Swift 6.2):
 - `swift/Sources/concurrency-type-check/TypingRules.swift` `concurrentAsync_callWithDisconnectedNonSendable_compiles()`
 - `swift/Sources/concurrency-type-check/TypingRules.swift` `concurrentAsync_callThenSend_compiles()`
 - `swift/Sources/concurrency-type-check/TypingRules.swift` `negative_concurrentAsync_callWithActorBoundNonSendable_isError()` (`NEGATIVE_CONCURRENT_CALL_ACTOR_BOUND_ARG`)
+- `swift/Sources/concurrency-type-check/TypingRules.swift` `negative_concurrentCall_closureLiteralFromGlobalActor_isError()` (`NEGATIVE_CONCURRENT_CALL_CLOSURE_LITERAL_FROM_GLOBAL_ACTOR`)
 
 ```swift
 @MainActor
@@ -1890,6 +1983,26 @@ func concurrentCall_disconnectedNonSendableExample() async {
     // await f(mainActorConnectedVar) // ❌ error (negative test: actor-bound argument)
 }
 ```
+
+The same rule applies when the `A : ~Sendable` value is a `closure literal`.
+When the parameter is neither `@Sendable` nor `sending`, [`closure-inherit-parent`](#closure-inherit-parent) makes the closure inherit the caller's isolation, placing it in the `isolated(globalActor)` region.
+The premise `arg : A at disconnected` therefore cannot be satisfied, and `call-concurrent-nonsendable` does not apply:
+
+```swift
+@concurrent
+func concurrentTakingNonSendableAsyncClosure(_ body: () async -> Void) async {}
+
+@MainActor
+func concurrentCall_closureLiteralFromGlobalActor_errorExample() async {
+    // closure literal `{}` inherits @MainActor via closure-inherit-parent
+    // → its region is isolated(MainActor), not disconnected
+    // → call-concurrent-nonsendable premise (arg at disconnected) fails
+    // await concurrentTakingNonSendableAsyncClosure {} // ❌ sending value of non-Sendable type
+}
+```
+
+Reference: [Swift Forums — Isolated closures and `@concurrent` functions](https://forums.swift.org/t/isolated-closures-and-concurrent-functions/86614)
+The workaround is to make the closure side an inference boundary (add `@Sendable`, declare it as a `sending` parameter, or annotate the parameter type with an explicit isolation). All of these convert the closure into [`closure-no-inherit-parent`](#closure-no-inherit-parent) or a `Sendable` function type, making [`call-concurrent-sendable`](#call-concurrent-sendable) applicable.
 
 #### call-nonisolated-async-inherit
 

@@ -1573,3 +1573,125 @@ private func negative_asyncLet_actorBoundCapture_isError() async {
 }
 
 #endif
+
+// =============================================================================
+// MARK: - initArgRegion (decl-fun parameter region elaboration)
+// =============================================================================
+//
+// PoC for each branch of `initArgRegion(@ι, A, [sending])`. Each function
+// exercises one rule by performing an operation whose success or failure
+// pins down the parameter's post-entry region.
+//
+// Regions are not directly observable, so we infer them from compiler
+// diagnostics:
+//   - disconnected     → cross-actor `sending` transfer succeeds
+//   - isolated(actor)  → cross-actor `sending` transfer fails
+//   - task             → capturable by nonisolated closure but NOT by @MainActor closure
+//   - _                → any operation valid for the underlying Sendable type
+
+// ----- (init-arg-sendable): A : Sendable → ρ = _ -----
+
+// Sendable parameter is normalized to `_`: no region restriction.
+@MainActor
+private func initArgRegion_sendable_anyBody_unrestricted(x: MySendable) async {
+    let other = SendableActor()
+    _ = await other.echo(x) // ✅ no region restriction (any isolation crossing OK)
+}
+
+// ----- (init-arg-sending): [sending] ∈ { sending } → ρ = disconnected -----
+
+// `sending` parameter in @MainActor body is `disconnected` despite caller's region.
+@MainActor
+private func initArgRegion_sending_mainActorBody_paramAtDisconnected(
+    x: sending NonSendable
+) async {
+    let other = OtherActor()
+    await other.useNonSendableSending(x) // ✅ disconnected → cross-iso transfer
+}
+
+// `sending` parameter in @nonisolated body is also `disconnected`.
+private func initArgRegion_sending_nonisolatedBody_paramAtDisconnected(
+    x: sending NonSendable
+) async {
+    let other = OtherActor()
+    await other.useNonSendableSending(x) // ✅ disconnected → cross-iso transfer
+}
+
+// ----- (init-arg-actor-isolated) global actor: @ι = @isolated(globalActor) -----
+
+// non-`sending` parameter in @MainActor body is at `isolated(MainActor)`:
+// freely usable within MainActor (e.g., bind into an @MainActor field).
+@MainActor
+private func initArgRegion_mainActorBody_paramAtIsolatedMainActor(
+    x: NonSendable
+) {
+    mainActorHolder.field = x       // ✅ same-region store
+    _ = mainActorHolder.field?.value // ✅ still in @MainActor region
+    _ = x.value                      // ✅ still usable
+}
+
+#if NEGATIVE_INIT_ARG_ACTOR_ISOLATED_MAINACTOR_CANNOT_CROSS
+
+// `isolated(MainActor)` ≠ `disconnected` → cannot send to another actor.
+@MainActor
+private func negative_initArgRegion_mainActorBody_cannotSendCrossActor(
+    x: NonSendable
+) async {
+    let other = OtherActor()
+    await other.useNonSendableSending(x) // ❌ main actor-isolated 'x'
+}
+
+#endif
+
+// ----- (init-arg-actor-isolated) actor instance: @ι = @isolated(self) -----
+
+private actor InitArgRegionProbeActor {
+    var state: NonSendable = NonSendable()
+
+    // non-`sending` parameter in actor method is at `isolated(self)`:
+    // bindable into actor state (same region).
+    func paramAtIsolatedSelf(x: NonSendable) {
+        self.state = x // ✅ same-region store
+        _ = x.value    // ✅ still usable
+    }
+
+    #if NEGATIVE_INIT_ARG_ACTOR_INSTANCE_CANNOT_CROSS
+    // `isolated(self)` ≠ `disconnected` → cannot send cross-actor.
+    func negative_actorInstance_cannotSendCrossActor(x: NonSendable) async {
+        let other = OtherActor()
+        await other.useNonSendableSending(x) // ❌ actor-isolated 'x'
+    }
+    #endif
+}
+
+// ----- (init-arg-nonisolated): @ι = @nonisolated → ρ = task -----
+
+// non-`sending` parameter in @nonisolated sync body is at `task`:
+// capturable by nonisolated/@isolated(any) closures.
+private func initArgRegion_nonisolatedSync_paramAtTask(x: NonSendable) {
+    let _: () -> Void = { _ = x.value }                 // ✅ nonisolated closure
+    let _: @isolated(any) () -> Void = { _ = x.value }  // ✅ @isolated(any) closure
+}
+
+// Same for @nonisolated async body.
+private func initArgRegion_nonisolatedAsync_paramAtTask(x: NonSendable) async {
+    let _: () -> Void = { _ = x.value }                 // ✅ nonisolated closure
+    let _: @isolated(any) () -> Void = { _ = x.value }  // ✅ @isolated(any) closure
+}
+
+#if NEGATIVE_INIT_ARG_NONISOLATED_TASK_NOT_CAPTURABLE_BY_MAINACTOR
+
+// `task` ≠ `isolated(MainActor)` → @MainActor closure cannot capture.
+private func negative_initArgRegion_nonisolatedSync_cannotCaptureInMainActorClosure(
+    x: NonSendable
+) {
+    let _: @MainActor () -> Void = { _ = x.value } // ❌ task-isolated 'x'
+}
+
+private func negative_initArgRegion_nonisolatedAsync_cannotCaptureInMainActorClosure(
+    x: NonSendable
+) async {
+    let _: @MainActor () -> Void = { _ = x.value } // ❌ task-isolated 'x'
+}
+
+#endif
