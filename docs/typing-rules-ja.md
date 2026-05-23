@@ -43,6 +43,12 @@
     - [init-arg-sending](#init-arg-sending)
     - [init-arg-actor-isolated](#init-arg-actor-isolated)
     - [init-arg-nonisolated](#init-arg-nonisolated)
+  - [2.11 ジェネリックパラメータの metatype Sendability (`metaSendable`)](#211-ジェネリックパラメータの-metatype-sendability-metasendable)
+    - [`containsNonMarkerProtocols` と `metaSendable`](#containsnonmarkerprotocols-と-metasendable)
+    - [`isAllSendable` の拡張](#isallsendable-の拡張)
+    - [Actor self capture への適用](#actor-self-capture-への適用)
+    - [修正方針](#修正方針)
+    - [コンパイラ実装](#コンパイラ実装)
 - [3. 同期・非同期境界 (Sync/Async Boundaries)](#3-同期非同期境界-syncasync-boundaries)
   - [3.1 async 関数本体 (`α` の導入境界)](#31-async-関数本体-α-の導入境界)
     - [decl-fun-isolated-param](#decl-fun-isolated-param)
@@ -732,6 +738,97 @@ initArgRegion(@nonisolated, A, ·) = task
 - [`init-arg-nonisolated`](#init-arg-nonisolated):
   - `initArgRegion_nonisolatedSync_paramAtTask()` / `initArgRegion_nonisolatedAsync_paramAtTask()` — `@nonisolated` 本体の non-`sending` 引数が `task` (nonisolated / `@isolated(any)` クロージャに capture 可能)
   - `negative_initArgRegion_nonisolatedSync_cannotCaptureInMainActorClosure()` / `negative_initArgRegion_nonisolatedAsync_cannotCaptureInMainActorClosure()` (`NEGATIVE_INIT_ARG_NONISOLATED_TASK_NOT_CAPTURABLE_BY_MAINACTOR`) — `task ≠ isolated(MainActor)` の裏付け
+
+### 2.11 ジェネリックパラメータの metatype Sendability (`metaSendable`)
+
+[`isAllSendable`](#sendable-capture-制約-isallsendable) では capture 環境の各値型 `T` に対して `T : Sendable` を要求する。
+`T` がジェネリックパラメータ (archetype) のときに「`T.Type` が Sendable か」を決めるのがこの節の補助述語 `metaSendable(T)` である。
+
+ジェネリックパラメータの **conformance 制約は実行時に witness table として metatype に同伴して運ばれる**。
+したがって `T.Type` を別 isolation へ送れるかは、`T` 自身が Sendable かではなく **「どの witness が同伴するか」** で決まる:
+
+- non-marker な protocol への conformance 要求 (`Equatable`, `Hashable`, …) はそれぞれ witness table を持ち、別 isolation へ運ぶと isolated conformance がすり抜け得る → metatype は `~Sendable`
+- marker protocol (`Sendable`, `SendableMetatype`, `Copyable`, …) は witness table を持たないため、metatype の運搬には影響しない
+- `T : SendableMetatype` が要求されていれば、metatype が isolation を越えて運ばれても安全であることが型レベルで保証される
+- `Sendable : SendableMetatype` の継承関係により、`T : Sendable` は `T : SendableMetatype` を含意する
+
+#### `containsNonMarkerProtocols` と `metaSendable`
+
+```text
+MarkerProtocols ≜ { Sendable, SendableMetatype, Copyable, Escapable, BitwiseCopyable }
+
+containsNonMarkerProtocols(P) : Bool
+containsNonMarkerProtocols(P)  ⟺  P ⊄ MarkerProtocols
+```
+
+```text
+metaSendable(T) : Bool                                          (T ∈ Archetype)
+
+metaSendable(T)  ⟺
+    T : SendableMetatype                                        (Sendable は継承で含む)
+  ∨ conformsTo(T) ⊆ MarkerProtocols
+```
+
+非 archetype (具体型) については通常の `Sendable` 検査に委ねるため、本書では archetype のみを対象とする。
+
+#### `isAllSendable` の拡張
+
+[`@Sendable` capture 制約](#sendable-capture-制約-isallsendable) における `T : Sendable` の判定は、`T` が archetype のとき次のように具体化される:
+
+```text
+T : Sendable   ⇐⇒   metaSendable(T) = true   (T が archetype のとき)
+```
+
+すなわち [`isAllSendable`](#sendable-capture-制約-isallsendable) は、archetype capture では metatype Sendability に還元される。
+このため `actor A<State> { ... }` の self を `@Sendable` クロージャに送る場合、`State` の制約だけで合否が決まる。
+
+#### Actor self capture への適用
+
+actor 内部から `Task.detached { [self] in ... }` のように `@Sendable` クロージャへ `self` を渡すと、
+capture に `Self.State` (= actor のジェネリックパラメータの archetype) が含まれる。
+このとき `metaSendable(State)` が要求される。
+
+| Actor シグネチャ                                              | `metaSendable(State)` | `@Sendable` への `[self]` capture |
+| ------------------------------------------------------------- | --------------------- | --------------------------------- |
+| `actor A<State>`                                              | true                  | OK                                |
+| `actor A<State> where State: Equatable`                       | false                 | ❌ `'State.Type' is non-Sendable` |
+| `actor A<State> where State: SendableMetatype & Equatable`    | true                  | OK                                |
+| `actor A<State> where State: Sendable`                        | true (継承)           | OK                                |
+
+警告は **per-generic-parameter ではなく per-conformance-witness** で発火する点に注意。
+`State` 自体ではなく、`Equatable` の witness が isolation を越えて運ばれることが問題である。
+
+#### 修正方針
+
+`Equatable` 等の non-marker conformance を残したい場合、`State: SendableMetatype` を追加すれば metatype の Sendability が型レベルで保証される:
+
+```swift
+actor A<State> where State: SendableMetatype & Equatable { ... }
+```
+
+`State` 自体を Sendable にしてよいなら `State: Sendable` でも同じ効果が得られる (含意関係)。
+
+#### コンパイラ実装
+
+- `lib/AST/ConformanceLookup.cpp` `metatypeWithInstanceTypeIsSendable(Type instanceType)`
+  - `instanceType` が archetype のとき、`containsNonMarkerProtocols(archetype->getConformsTo())` で判定
+  - `SendableMetatype` への conformance があれば true
+- `lib/AST/GenericSignature.cpp` `GenericSignatureImpl::prohibitsIsolatedConformance(Type)`
+  - `Sendable` / `SendableMetatype` 要求があれば「isolated conformance を運ばない」とみなす
+- `lib/Sema/TypeCheckConcurrency.cpp` 周辺
+  - `@Sendable` クロージャの captured archetype を `mayHaveIsolatedConformance()` でフィルタした上で、`MetatypeType::get(T)` の Sendability を `diag::non_sendable_metatype_capture` (`[#SendableMetatypes]`) として診断
+- `stdlib/public/core/Sendable.swift`
+  - `@_marker public protocol SendableMetatype: ~Copyable, ~Escapable { }`
+  - `@_marker public protocol Sendable: SendableMetatype, ~Copyable, ~Escapable { }`
+
+検証 (Swift 6.2):
+
+- `swift/Sources/concurrency-type-check/SendableMetatypeForGenerics.swift`
+  - `ActorWithUnconstrainedGeneric` — `actor A<State>` で `[self]` capture が警告なし
+  - `ActorWithSendableMetatypeAndEquatable` — `State: SendableMetatype & Equatable` で警告なし
+  - `ActorWithSendableState` — `State: Sendable` で警告なし (SendableMetatype 継承)
+  - `NegativeActorWithEquatableState` (`NEGATIVE_ACTOR_GENERIC_EQUATABLE_NO_SENDABLE_METATYPE`) — `State: Equatable` のみで `'State.Type' is non-Sendable` 警告
+  - `negative_passMetaVal` (`NEGATIVE_GENERIC_FUNC_PROTOCOL_NO_SENDABLE_METATYPE`) — actor 以外の generic 関数でも同じ規則が効くことを示す
 
 ---
 
