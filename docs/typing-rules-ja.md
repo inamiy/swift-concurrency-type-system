@@ -98,6 +98,7 @@
     - [call-same-sync-sendable](#call-same-sync-sendable)
     - [call-same-async-sendable](#call-same-async-sendable)
     - [call-same-nonsendable-merge](#call-same-nonsendable-merge)
+    - [call-same-sending-result](#call-same-sending-result)
     - [call-cross-sendable](#call-cross-sendable)
     - [call-cross-sending-result](#call-cross-sending-result)
     - [call-cross-nonsending-result-error](#call-cross-nonsending-result-error)
@@ -1605,7 +1606,7 @@ func regionMergeExample() async {
 | Family | 条件 | 意味 | この節の規則 |
 |---|---|---|---|
 | `call-nonsendable-*` | `canSend` 成立 | `~Sendable` 値の消費判定 (統一規則) | [`call-nonsendable-noconsume`](#call-nonsendable-noconsume), [`call-nonsendable-consume`](#call-nonsendable-consume) |
-| `call-same-*` | `@κ = @ι` | 同一 isolation 呼び出し (boundary crossing なし) | [`call-same-sync-sendable`](#call-same-sync-sendable), [`call-same-async-sendable`](#call-same-async-sendable), [`call-same-nonsendable-merge`](#call-same-nonsendable-merge) |
+| `call-same-*` | `@κ = @ι` | 同一 isolation 呼び出し (boundary crossing なし) | [`call-same-sync-sendable`](#call-same-sync-sendable), [`call-same-async-sendable`](#call-same-async-sendable), [`call-same-nonsendable-merge`](#call-same-nonsendable-merge), [`call-same-sending-result`](#call-same-sending-result) |
 | `call-cross-*` | `@κ ≠ @ι`, `@ι ∉ { @concurrent }` (ただし [`call-cross-sendable`](#call-cross-sendable) は `@ι ≠ @nonisolated`) | 境界越え呼び出し | [`call-cross-sendable`](#call-cross-sendable), [`call-cross-sending-result`](#call-cross-sending-result), [`call-cross-nonsending-result-error`](#call-cross-nonsending-result-error) |
 | `call-concurrent-*` | `@ι = @concurrent` | 明示 nonisolated async 呼び出し (専用セマンティクス) | [`call-concurrent-sendable`](#call-concurrent-sendable), [`call-concurrent-nonsendable`](#call-concurrent-nonsendable) |
 | [`call-nonisolated-async-inherit`](#call-nonisolated-async-inherit) | `@ι = @nonisolated`, `async` | SE-0461 の caller isolation 継承 | [`call-nonisolated-async-inherit`](#call-nonisolated-async-inherit) |
@@ -1966,6 +1967,57 @@ func sameIsolationNonSendableBindsExample() async {
 }
 ```
 
+#### call-same-sending-result
+
+同一 isolation 呼び出しで結果型が `→ sending B` (`B : ~Sendable`) の場合、返り値を **常に `disconnected`** として受け取れることを与える規則である。
+
+```text
+Γ; @κ; α ⊢ f : @σ @κ () α' → sending B  at ρ_f  ⊣  Γ'
+B : ~Sendable
+──────────────────────────────────────────────────────────── (call-same-sending-result)
+Γ; @κ; α ⊢ [await] f() : B at disconnected  ⊣  Γ'
+```
+
+`[await]` は `α' = async` の場合に付与される。
+
+**他の同一 isolation 規則との関係**:
+
+| 関数型 | 適用規則 | 結果 region `ρ_b` |
+|---|---|---|
+| `→ B`, `B : Sendable` | [`call-same-sync-sendable`](#call-same-sync-sendable) / [`call-same-async-sendable`](#call-same-async-sendable) | `_` (正規形) |
+| `→ B`, `B : ~Sendable` (`sending` なし) | [`call-same-sync-sendable`](#call-same-sync-sendable) / [`call-same-async-sendable`](#call-same-async-sendable) / [`call-same-nonsendable-merge`](#call-same-nonsendable-merge) | `ρ_b ∈ accessible(@κ)` (callee 本体に依存; fresh なら `disconnected`、actor state 由来なら `isolated(@κ)`) |
+| **`→ sending B`, `B : ~Sendable`** | **本規則 [`call-same-sending-result`](#call-same-sending-result)** | **`disconnected` (型レベル契約で固定)** |
+
+差は「**型レベル契約**」の有無である。`sending` なしの場合、`ρ_b` は callee 本体の region 解析に依存し、`disconnected` になるとは限らない (例: 1920-1930 の `sameAsyncNonSendableExample` で `fresh` は `disconnected`、`fromActorState` は `isolated(MainActor)`)。
+`→ sending B` は SE-0430 により callee 側で「返す値はどの isolation domain にも束縛されていない」ことを型で保証するため、本体に依存せず常に `disconnected` として受け取れる。
+
+[`call-cross-sending-result`](#call-cross-sending-result) との関係:
+
+- 両者とも `sending` 結果は **`disconnected`** で受け取る点は同じ。
+- `call-cross-sending-result` は `@κ ≠ @ι` (cross-iso) を前提とし `α = async` (await 必須) を要求する。
+- `call-same-sending-result` は `@κ = @ι` (same-iso) を前提とし、`call-same-*` ファミリーと同様に sync/async いずれにも適用される (sync 呼び出しからの `sending` 結果も `disconnected`)。
+
+これにより、actor-isolated メソッドが自分自身を呼び出して `sending` 結果を得たあと、その値を別 isolation へ送るパターンが型レベルで導出可能になる。
+
+参考: [Swift Forums "Region-Based Isolation and Sending Return Values"](https://forums.swift.org/t/region-based-isolation-sending-return-value-actor-isolation-what-is-the-expected-behavior/75455)。フォーラムでは初期実装で same-iso 呼び出し時にこの規則が効いていない挙動が報告されていたが、Swift 6.2 以降は本規則どおりに受理される。
+
+検証 (Swift 6.2+):
+- `swift/Sources/concurrency-type-check/SendingResultForum.swift` `ForumSameIsoActor.makeAndSend()` (actor 内で自分の `sending` メソッドを呼び、結果を `@MainActor` に送れる)
+- `swift/Sources/concurrency-type-check/SendingResultForum.swift` `ForumSameIsoActor_NoSending.makeAndSend()` (`NEGATIVE_SAME_ISO_NON_SENDING_RESULT`) — `sending` を外し、かつ本体で actor state を返す場合は cross-iso 送信が `isolated(self)` ≠ `disconnected` でエラーになる
+
+```swift
+private actor ForumSameIsoActor {
+    func makeValue() -> sending NonSendable { NonSendable() }
+
+    @MainActor
+    func sendToMain(_ value: NonSendable) {}
+
+    func makeAndSend() async {
+        let v = makeValue()       // ✅ v at disconnected (sending result, same-iso)
+        await sendToMain(v)       // ✅ disconnected → @MainActor (implicit transfer)
+    }
+}
+```
 
 #### call-cross-sendable
 
@@ -2024,9 +2076,15 @@ B : ~Sendable    @κ ≠ @ι    @ι ∉ { @concurrent }
 
 これは消費 (環境の縮小) ではなく、**安全な値の生成**を保証する規則である。
 
-検証 (Swift 6.2):
+[`call-same-sending-result`](#call-same-sending-result) との関係: 両者とも `sending` 結果は `disconnected` で受け取るが、cross-iso では境界越えのため `α = async` (await 必須) を伴う。
+
+参考: [Swift Forums "Region-Based Isolation and Sending Return Values"](https://forums.swift.org/t/region-based-isolation-sending-return-value-actor-isolation-what-is-the-expected-behavior/75455) の Example 2 (`nonisolated func` から `@globalActor` 付き struct のメソッドを呼び `sending` 結果を `@MainActor` に送る) はこの規則の典型例である。
+
+検証 (Swift 6.2+):
 - `swift/Sources/concurrency-type-check/TypingRules.swift` `crossActor_sendingResult_compiles()` (返り値を別 actor へ再送できる＝`disconnected`)
 - `swift/Sources/concurrency-type-check/TypingRules.swift` `negative_crossActor_nonSendingResult_isError()` (`NEGATIVE_RESULT`)
+- `swift/Sources/concurrency-type-check/SendingResultForum.swift` `forumCrossIsoSendingResult_compiles(box:)` (`nonisolated → @globalActor` の forum 再現)
+- `swift/Sources/concurrency-type-check/SendingResultForum.swift` `negative_forumCrossIso_nonSendingResult_isError(box:)` (`NEGATIVE_CROSS_ISO_NON_SENDING_RESULT`)
 
 ```swift
 @MainActor
