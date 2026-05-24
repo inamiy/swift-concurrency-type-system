@@ -43,6 +43,12 @@ This document systematically summarizes the typing rules for Swift 6.2 Concurren
     - [init-arg-sending](#init-arg-sending)
     - [init-arg-actor-isolated](#init-arg-actor-isolated)
     - [init-arg-nonisolated](#init-arg-nonisolated)
+  - [2.11 Metatype Sendability for Generic Parameters (`metaSendable`)](#211-metatype-sendability-for-generic-parameters-metasendable)
+    - [`containsNonMarkerProtocols` and `metaSendable`](#containsnonmarkerprotocols-and-metasendable)
+    - [Extension of `isAllSendable`](#extension-of-isallsendable)
+    - [Application to actor self capture](#application-to-actor-self-capture)
+    - [How to fix](#how-to-fix)
+    - [Compiler implementation](#compiler-implementation)
 - [3. Sync/Async Boundaries](#3-syncasync-boundaries)
   - [3.1 async Function Body (introduction boundary of `α`)](#31-async-function-body-introduction-boundary-of-α)
     - [decl-fun-isolated-param](#decl-fun-isolated-param)
@@ -719,6 +725,96 @@ The PoC is consolidated in the MARK section `initArgRegion (decl-fun parameter r
 - [`init-arg-nonisolated`](#init-arg-nonisolated):
   - `initArgRegion_nonisolatedSync_paramAtTask()` / `initArgRegion_nonisolatedAsync_paramAtTask()` — non-`sending` parameter in `@nonisolated` body is `task` (capturable by nonisolated / `@isolated(any)` closures)
   - `negative_initArgRegion_nonisolatedSync_cannotCaptureInMainActorClosure()` / `negative_initArgRegion_nonisolatedAsync_cannotCaptureInMainActorClosure()` (`NEGATIVE_INIT_ARG_NONISOLATED_TASK_NOT_CAPTURABLE_BY_MAINACTOR`) — confirms `task ≠ isolated(MainActor)`
+
+### 2.11 Metatype Sendability for Generic Parameters (`metaSendable`)
+
+[`isAllSendable`](#sendable-capture-constraint-isallsendable) requires `T : Sendable` for each value type `T` in the capture environment.
+When `T` is a generic parameter (archetype), the auxiliary predicate `metaSendable(T)` defined in this section decides whether `T.Type` is Sendable.
+
+A generic parameter's **conformance requirements are carried at runtime as witness tables that accompany the metatype**.
+Therefore, whether `T.Type` may cross into another isolation domain is determined not by whether `T` itself is Sendable, but by **which witnesses travel with it**:
+
+- A conformance requirement to a non-marker protocol (`Equatable`, `Hashable`, …) carries a witness table; sending it to another isolation lets an isolated conformance escape → the metatype is `~Sendable`
+- Marker protocols (`Sendable`, `SendableMetatype`, `Copyable`, …) carry no witness table and do not affect metatype transmission
+- If `T : SendableMetatype` is required, the metatype is guaranteed at the type level to be safe to send across isolations
+- Through the inheritance `Sendable : SendableMetatype`, `T : Sendable` implies `T : SendableMetatype`
+
+#### `containsNonMarkerProtocols` and `metaSendable`
+
+```text
+MarkerProtocols ≜ { Sendable, SendableMetatype, Copyable, Escapable, BitwiseCopyable }
+
+containsNonMarkerProtocols(P) : Bool
+containsNonMarkerProtocols(P)  ⟺  P ⊄ MarkerProtocols
+```
+
+```text
+metaSendable(T) : Bool                                          (T ∈ Archetype)
+
+metaSendable(T)  ⟺
+    T : SendableMetatype                                        (covers Sendable by inheritance)
+  ∨ conformsTo(T) ⊆ MarkerProtocols
+```
+
+Non-archetype (concrete) types are delegated to ordinary `Sendable` checking, so this document only treats archetypes here.
+
+#### Extension of `isAllSendable`
+
+For the [`@Sendable` capture constraint](#sendable-capture-constraint-isallsendable), the check `T : Sendable` is specialized as follows when `T` is an archetype:
+
+```text
+T : Sendable   ⇐⇒   metaSendable(T) = true   (when T is an archetype)
+```
+
+That is, [`isAllSendable`](#sendable-capture-constraint-isallsendable) reduces to metatype Sendability for archetype captures.
+Consequently, when sending the `self` of `actor A<State> { ... }` into a `@Sendable` closure, the verdict depends solely on `State`'s constraints.
+
+#### Application to actor self capture
+
+When `self` is sent from inside an actor into a `@Sendable` closure as in `Task.detached { [self] in ... }`, the capture includes `Self.State` (i.e. the archetype of the actor's generic parameter).
+At that point `metaSendable(State)` is required.
+
+| Actor signature                                               | `metaSendable(State)` | `[self]` capture into `@Sendable` |
+| ------------------------------------------------------------- | --------------------- | --------------------------------- |
+| `actor A<State>`                                              | true                  | OK                                |
+| `actor A<State> where State: Equatable`                       | false                 | ❌ `'State.Type' is non-Sendable` |
+| `actor A<State> where State: SendableMetatype & Equatable`    | true                  | OK                                |
+| `actor A<State> where State: Sendable`                        | true (by inheritance) | OK                                |
+
+The warning fires **per-conformance-witness, not per-generic-parameter**.
+The problem is not `State` itself, but that the `Equatable` witness would be carried across isolation.
+
+#### How to fix
+
+To keep a non-marker conformance such as `Equatable`, adding `State: SendableMetatype` guarantees metatype Sendability at the type level:
+
+```swift
+actor A<State> where State: SendableMetatype & Equatable { ... }
+```
+
+If making `State` itself Sendable is acceptable, `State: Sendable` achieves the same effect (by inheritance).
+
+#### Compiler implementation
+
+- `lib/AST/ConformanceLookup.cpp` `metatypeWithInstanceTypeIsSendable(Type instanceType)`
+  - For an archetype `instanceType`, checked via `containsNonMarkerProtocols(archetype->getConformsTo())`
+  - Returns true when a conformance to `SendableMetatype` is present
+- `lib/AST/GenericSignature.cpp` `GenericSignatureImpl::prohibitsIsolatedConformance(Type)`
+  - A `Sendable` / `SendableMetatype` requirement is treated as "does not carry an isolated conformance"
+- `lib/Sema/TypeCheckConcurrency.cpp` and surroundings
+  - Captured archetypes of a `@Sendable` closure are filtered through `mayHaveIsolatedConformance()` before diagnosing the Sendability of `MetatypeType::get(T)` as `diag::non_sendable_metatype_capture` (`[#SendableMetatypes]`)
+- `stdlib/public/core/Sendable.swift`
+  - `@_marker public protocol SendableMetatype: ~Copyable, ~Escapable { }`
+  - `@_marker public protocol Sendable: SendableMetatype, ~Copyable, ~Escapable { }`
+
+Verified (Swift 6.2):
+
+- `swift/Sources/concurrency-type-check/SendableMetatypeForGenerics.swift`
+  - `ActorWithUnconstrainedGeneric` — no warning for `[self]` capture in `actor A<State>`
+  - `ActorWithSendableMetatypeAndEquatable` — no warning under `State: SendableMetatype & Equatable`
+  - `ActorWithSendableState` — no warning under `State: Sendable` (SendableMetatype by inheritance)
+  - `NegativeActorWithEquatableState` (`NEGATIVE_ACTOR_GENERIC_EQUATABLE_NO_SENDABLE_METATYPE`) — `'State.Type' is non-Sendable` warning under `State: Equatable` alone
+  - `negative_passMetaVal` (`NEGATIVE_GENERIC_FUNC_PROTOCOL_NO_SENDABLE_METATYPE`) — shows the same rule applies to generic functions outside of actors
 
 ---
 
