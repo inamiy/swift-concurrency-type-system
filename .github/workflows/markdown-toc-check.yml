@@ -22,6 +22,11 @@ jobs:
           repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
           token: ${{ secrets.GITHUB_TOKEN }}
 
+      # `docs/scripts/Package.swift` requires swift-tools-version 6.2 (ships with Xcode 26).
+      - uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: latest-stable
+
       - name: Show Swift version
         run: swift --version
 
