@@ -98,6 +98,7 @@ This document systematically summarizes the typing rules for Swift 6.2 Concurren
     - [call-same-sync-sendable](#call-same-sync-sendable)
     - [call-same-async-sendable](#call-same-async-sendable)
     - [call-same-nonsendable-merge](#call-same-nonsendable-merge)
+    - [call-same-sending-result](#call-same-sending-result)
     - [call-cross-sendable](#call-cross-sendable)
     - [call-cross-sending-result](#call-cross-sending-result)
     - [call-cross-nonsending-result-error](#call-cross-nonsending-result-error)
@@ -1567,7 +1568,7 @@ The `call-*` rule name prefix should be read by the following family first:
 | Family | Condition | Meaning | Rules in this section |
 |---|---|---|---|
 | `call-nonsendable-*` | `canSend` holds | Consumption judgment for `~Sendable` values (unified rule) | [`call-nonsendable-noconsume`](#call-nonsendable-noconsume), [`call-nonsendable-consume`](#call-nonsendable-consume) |
-| `call-same-*` | `@κ = @ι` | Same-isolation call (no boundary crossing) | [`call-same-sync-sendable`](#call-same-sync-sendable), [`call-same-async-sendable`](#call-same-async-sendable), [`call-same-nonsendable-merge`](#call-same-nonsendable-merge) |
+| `call-same-*` | `@κ = @ι` | Same-isolation call (no boundary crossing) | [`call-same-sync-sendable`](#call-same-sync-sendable), [`call-same-async-sendable`](#call-same-async-sendable), [`call-same-nonsendable-merge`](#call-same-nonsendable-merge), [`call-same-sending-result`](#call-same-sending-result) |
 | `call-cross-*` | `@κ ≠ @ι`, `@ι ∉ { @concurrent }` (though [`call-cross-sendable`](#call-cross-sendable) additionally requires `@ι ≠ @nonisolated`) | Cross-boundary calls | [`call-cross-sendable`](#call-cross-sendable), [`call-cross-sending-result`](#call-cross-sending-result), [`call-cross-nonsending-result-error`](#call-cross-nonsending-result-error) |
 | `call-concurrent-*` | `@ι = @concurrent` | Explicit nonisolated async calls (dedicated semantics) | [`call-concurrent-sendable`](#call-concurrent-sendable), [`call-concurrent-nonsendable`](#call-concurrent-nonsendable) |
 | [`call-nonisolated-async-inherit`](#call-nonisolated-async-inherit) | `@ι = @nonisolated`, `async` | Caller isolation inheritance per SE-0461 | [`call-nonisolated-async-inherit`](#call-nonisolated-async-inherit) |
@@ -1915,6 +1916,57 @@ func sameIsolationNonSendableBindsExample() async {
 }
 ```
 
+#### call-same-sending-result
+
+The rule giving that in a same-isolation call whose result type is `→ sending B` (`B : ~Sendable`), the return value can **always be received as `disconnected`**.
+
+```text
+Γ; @κ; α ⊢ f : @σ @κ () α' → sending B  at ρ_f  ⊣  Γ'
+B : ~Sendable
+──────────────────────────────────────────────────────────── (call-same-sending-result)
+Γ; @κ; α ⊢ [await] f() : B at disconnected  ⊣  Γ'
+```
+
+`[await]` is added when `α' = async`.
+
+**Relationship to other same-isolation rules**:
+
+| Function type | Applicable rule | Result region `ρ_b` |
+|---|---|---|
+| `→ B`, `B : Sendable` | [`call-same-sync-sendable`](#call-same-sync-sendable) / [`call-same-async-sendable`](#call-same-async-sendable) | `_` (normal form) |
+| `→ B`, `B : ~Sendable` (no `sending`) | [`call-same-sync-sendable`](#call-same-sync-sendable) / [`call-same-async-sendable`](#call-same-async-sendable) / [`call-same-nonsendable-merge`](#call-same-nonsendable-merge) | `ρ_b ∈ accessible(@κ)` (depends on the callee body; `disconnected` if fresh, `isolated(@κ)` if derived from actor state) |
+| **`→ sending B`, `B : ~Sendable`** | **This rule [`call-same-sending-result`](#call-same-sending-result)** | **`disconnected` (fixed by the type-level contract)** |
+
+The difference is the presence of a **type-level contract**. Without `sending`, `ρ_b` depends on the region analysis of the callee body and is not necessarily `disconnected` (e.g., in `sameAsyncNonSendableExample`, `fresh` is `disconnected` while `fromActorState` is `isolated(MainActor)`).
+Because `→ sending B` uses SE-0430 to guarantee at the type level that "the returned value is not bound to any isolation domain" on the callee side, it can always be received as `disconnected` independent of the body.
+
+Relationship to [`call-cross-sending-result`](#call-cross-sending-result):
+
+- Both rules receive a `sending` result as **`disconnected`**.
+- `call-cross-sending-result` presupposes `@κ ≠ @ι` (cross-iso) and requires `α = async` (await mandatory).
+- `call-same-sending-result` presupposes `@κ = @ι` (same-iso) and, like the rest of the `call-same-*` family, applies to both sync and async calls (a `sending` result from a sync call is also `disconnected`).
+
+This makes it derivable at the type level for an actor-isolated method to call itself, receive a `sending` result, and then send that value to a different isolation.
+
+Reference: [Swift Forums "Region-Based Isolation and Sending Return Values"](https://forums.swift.org/t/region-based-isolation-sending-return-value-actor-isolation-what-is-the-expected-behavior/75455). The forum reports that early implementations did not apply this rule for same-iso calls, but since Swift 6.2 it is accepted per this rule.
+
+Verification (Swift 6.2+):
+- `swift/Sources/concurrency-type-check/SendingResultForum.swift` `ForumSameIsoActor.makeAndSend()` (calling one's own `sending` method inside an actor and sending the result to `@MainActor`)
+- `swift/Sources/concurrency-type-check/SendingResultForum.swift` `ForumSameIsoActor_NoSending.makeAndSend()` (`NEGATIVE_SAME_ISO_NON_SENDING_RESULT`) — without `sending`, when the body returns actor state, cross-iso send fails because `isolated(self)` ≠ `disconnected`
+
+```swift
+private actor ForumSameIsoActor {
+    func makeValue() -> sending NonSendable { NonSendable() }
+
+    @MainActor
+    func sendToMain(_ value: NonSendable) {}
+
+    func makeAndSend() async {
+        let v = makeValue()       // ✅ v at disconnected (sending result, same-iso)
+        await sendToMain(v)       // ✅ disconnected → @MainActor (implicit transfer)
+    }
+}
+```
 
 #### call-cross-sendable
 
@@ -1967,9 +2019,15 @@ While a `sending` (SE-0430) argument is a consumption on the parameter side (tra
 
 This is a rule that guarantees **safe value production**, not consumption (environment shrinkage).
 
-Verification (Swift 6.2):
+Relationship to [`call-same-sending-result`](#call-same-sending-result): both rules receive a `sending` result as `disconnected`, but cross-iso requires `α = async` (await mandatory) because of the boundary crossing.
+
+Reference: [Swift Forums "Region-Based Isolation and Sending Return Values"](https://forums.swift.org/t/region-based-isolation-sending-return-value-actor-isolation-what-is-the-expected-behavior/75455). Example 2 (calling a `@globalActor`-annotated struct method from a `nonisolated func` and sending the `sending` result to `@MainActor`) is a typical case of this rule.
+
+Verification (Swift 6.2+):
 - `swift/Sources/concurrency-type-check/TypingRules.swift` `crossActor_sendingResult_compiles()` (the result can be re-sent to another actor = `disconnected`)
 - `swift/Sources/concurrency-type-check/TypingRules.swift` `negative_crossActor_nonSendingResult_isError()` (`NEGATIVE_RESULT`)
+- `swift/Sources/concurrency-type-check/SendingResultForum.swift` `forumCrossIsoSendingResult_compiles(box:)` (the `nonisolated → @globalActor` forum reproduction)
+- `swift/Sources/concurrency-type-check/SendingResultForum.swift` `negative_forumCrossIso_nonSendingResult_isError(box:)` (`NEGATIVE_CROSS_ISO_NON_SENDING_RESULT`)
 
 ```swift
 @MainActor
