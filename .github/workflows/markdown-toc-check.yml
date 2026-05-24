@@ -1,0 +1,62 @@
+name: Markdown TOC Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  markdown-toc:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # For PRs from the same repo: check out the PR head branch so we can push back.
+          # For pushes / fork PRs: falls back to the default checkout ref.
+          ref: ${{ github.event.pull_request.head.ref || github.ref }}
+          repository: ${{ github.event.pull_request.head.repo.full_name || github.repository }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Show Swift version
+        run: swift --version
+
+      - name: Regenerate markdown TOC
+        run: make markdown-toc
+
+      - name: Detect markdown diff
+        id: diff
+        run: |
+          if git diff --quiet -- '*.md' '**/*.md'; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            git diff --stat -- '*.md' '**/*.md'
+          fi
+
+      # --- PRs from the same repo: auto-commit and push the regenerated TOC ---
+      - name: Auto-commit regenerated TOC (same-repo PR only)
+        if: >-
+          steps.diff.outputs.changed == 'true' &&
+          github.event_name == 'pull_request' &&
+          github.event.pull_request.head.repo.full_name == github.repository
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add -- '*.md' '**/*.md'
+          git commit -m "chore: regenerate markdown TOC [skip ci]"
+          git push origin HEAD:${{ github.event.pull_request.head.ref }}
+
+      # --- Pushes to main or fork PRs: fail loudly, do NOT push back ---
+      - name: Fail if TOC is stale (push / fork PR)
+        if: >-
+          steps.diff.outputs.changed == 'true' &&
+          (github.event_name != 'pull_request' ||
+           github.event.pull_request.head.repo.full_name != github.repository)
+        run: |
+          echo "::error::Table of Contents is out of date. Run 'make markdown-toc' locally and commit the result."
+          exit 1
