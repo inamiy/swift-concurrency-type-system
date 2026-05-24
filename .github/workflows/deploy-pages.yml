@@ -37,6 +37,23 @@ jobs:
       - name: Rename slide for deploy
         run: mv slide/dist/swift-concurrency-type-system-slide.html slide/dist/slide.html
 
+      - name: Create index.html redirect to slide.html
+        run: |
+          cat > slide/dist/index.html <<'EOF'
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <title>Swift Concurrency Type System</title>
+            <meta http-equiv="refresh" content="0; url=slide.html">
+            <link rel="canonical" href="slide.html">
+          </head>
+          <body>
+            <p>Redirecting to <a href="slide.html">slide.html</a>&hellip;</p>
+          </body>
+          </html>
+          EOF
+
       - uses: actions/configure-pages@v5
 
       - uses: actions/upload-pages-artifact@v3
